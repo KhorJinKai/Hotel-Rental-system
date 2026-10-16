@@ -1,0 +1,66 @@
+@model List<HouseRentalSystem.Models.Property>
+@{
+    ViewData["Title"] = "Manage listings";
+    var search = ViewBag.Search as string;
+}
+
+<div class="container page-section">
+
+    <div class="results-head">
+        <div>
+            <h1>Manage listings</h1>
+            <span class="result-count">@Model.Count listing@(Model.Count == 1 ? "" : "s") across all owners</span>
+        </div>
+        <a class="btn-outline" asp-controller="Admin" asp-action="Index">Back to dashboard</a>
+    </div>
+
+    <form method="get" asp-controller="Admin" asp-action="Properties" style="display:flex; gap:10px; margin-bottom:18px;">
+        <input type="text" name="search" value="@search" placeholder="Search by title, city or owner name" style="flex:1;" />
+        <button type="submit" class="btn-outline btn-inline" style="margin-top:0;">Filter</button>
+    </form>
+
+    <div class="checkout-card">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Owner</th>
+                    <th>City</th>
+                    <th>Type</th>
+                    <th>Rent</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var property in Model)
+                {
+                    <tr>
+                        <td><strong>@property.Title</strong></td>
+                        <td>@property.Owner?.FullName</td>
+                        <td>@property.City</td>
+                        <td>@property.Category?.CategoryName</td>
+                        <td>RM @property.RentPrice.ToString("N0")</td>
+                        <td>
+                            <span class="status-pill @(property.IsAvailable ? "status-approved" : "status-neutral")">
+                                @(property.IsAvailable ? "Visible" : "Hidden")
+                            </span>
+                        </td>
+                        <td style="display:flex; gap:8px;">
+                            <a class="btn-outline btn-inline" style="margin-top:0;" asp-controller="Property" asp-action="Details" asp-route-id="@property.PropertyID">View</a>
+                            <form asp-controller="Admin" asp-action="TogglePropertyAvailability" asp-route-id="@property.PropertyID" method="post">
+                                <button type="submit" class="btn-outline btn-inline" style="margin-top:0;">
+                                    @(property.IsAvailable ? "Hide" : "Unhide")
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                @if (!Model.Any())
+                {
+                    <tr><td colspan="7" style="text-align:center; color:var(--text-muted);">No listings match your search.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

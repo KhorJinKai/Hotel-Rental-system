@@ -1,0 +1,78 @@
+@model List<HouseRentalSystem.Models.Property>
+@{
+    ViewData["Title"] = "My listings";
+    var availableCount = Model.Count(p => p.IsAvailable);
+}
+
+<div class="container page-section">
+
+    <div class="results-head">
+        <div>
+            <h1>My listings</h1>
+            <span class="result-count">
+                @Model.Count propert@(Model.Count == 1 ? "y" : "ies") &middot; @availableCount currently available
+            </span>
+        </div>
+        <a class="btn-primary btn-inline" asp-controller="Property" asp-action="Create">+ List a new property</a>
+    </div>
+
+    @if (!Model.Any())
+    {
+        <div class="empty-state">
+            <div class="icon">&#127968;</div>
+            <h3>You haven't listed any properties yet</h3>
+            <p>Publish your first listing and start receiving booking requests from verified tenants.</p>
+            <a class="btn-outline" asp-controller="Property" asp-action="Create">List a property</a>
+        </div>
+    }
+
+    <div class="property-grid">
+        @foreach (var property in Model)
+        {
+            var primaryPhoto = property.Photos?.FirstOrDefault(p => p.IsPrimary)?.PhotoPath
+                                ?? property.Photos?.FirstOrDefault()?.PhotoPath;
+            <div class="property-card">
+                <a class="card-link" asp-controller="Property" asp-action="Details" asp-route-id="@property.PropertyID">
+                    <div class="thumb">
+                        @if (!string.IsNullOrEmpty(primaryPhoto))
+                        {
+                            <img src="@primaryPhoto" alt="@property.Title" />
+                        }
+                        else
+                        {
+                            <span>&#127968;</span>
+                        }
+                        <span class="ribbon" style="background:@(property.IsAvailable ? "var(--accent-value)" : "var(--text-muted)");">
+                            @(property.IsAvailable ? "Available" : "Not available")
+                        </span>
+                        @if (property.Photos != null && property.Photos.Any())
+                        {
+                            <span class="photo-count">@property.Photos.Count photo@(property.Photos.Count == 1 ? "" : "s")</span>
+                        }
+                    </div>
+                    <div class="body">
+                        <p class="title">@property.Title</p>
+                        <p class="location">&#128205; @property.City</p>
+                        <div class="price">RM @property.RentPrice.ToString("N0") <small>/ month</small></div>
+                        <p style="font-size:12px; color:var(--text-muted); margin:8px 0 0;">
+                            @property.NumBedrooms bed &middot; @property.NumBathrooms bath &middot; listed @property.CreatedDate.ToString("d MMM yyyy")
+                        </p>
+                    </div>
+                </a>
+                <div class="card-foot" style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <a class="btn-outline" style="flex:1;" asp-controller="Property" asp-action="Edit" asp-route-id="@property.PropertyID">
+                        Edit
+                    </a>
+                    <form asp-controller="Property" asp-action="ToggleAvailability" asp-route-id="@property.PropertyID" method="post" style="flex:1;">
+                        <button type="submit" class="btn-outline btn-inline" style="width:100%; margin-top:0;">
+                            @(property.IsAvailable ? "Mark unavailable" : "Mark available")
+                        </button>
+                    </form>
+                    <a class="btn-outline" style="flex:1; color:var(--accent-urgent); border-color:var(--accent-urgent);" asp-controller="Property" asp-action="Delete" asp-route-id="@property.PropertyID">
+                        Delete
+                    </a>
+                </div>
+            </div>
+        }
+    </div>
+</div>

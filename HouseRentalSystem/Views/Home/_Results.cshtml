@@ -1,0 +1,272 @@
+@model HouseRentalSystem.Models.HomeSearchViewModel
+@{
+    // The results column, rendered on its own so the AJAX search module (site.js) can
+    // refetch just this markup when a filter, the sort or the page changes. The parent
+    // page (Index.cshtml) still owns the hero, search bar and filter rail.
+    var sortOptions = new (string Key, string Label)[]
+    {
+        ("recommended", "Recommended"),
+        ("price_low", "Lowest rent"),
+        ("price_high", "Highest rent"),
+        ("rating", "Top reviewed"),
+        ("newest", "Newest listings")
+    };
+
+    var firstOnPage = Model.TotalResults == 0 ? 0 : (Model.Page - 1) * Model.PageSize + 1;
+    var lastOnPage = Math.Min(Model.Page * Model.PageSize, Model.TotalResults);
+}
+
+<div class="results-head">
+    <div>
+        @if (!string.IsNullOrWhiteSpace(Model.Location))
+        {
+            <h1>Rentals in @Model.Location</h1>
+        }
+        else
+        {
+            <h1>Rentals across Malaysia</h1>
+        }
+        <span class="result-count">
+            @Model.TotalResults @(Model.TotalResults == 1 ? "property" : "properties") available
+            @if (Model.TotalPages > 1)
+            {
+                <text>&middot; showing @firstOnPage&ndash;@lastOnPage</text>
+            }
+            @if (Model.MoveInDate.HasValue)
+            {
+                <text>&middot; move in from @Model.MoveInDate.Value.ToString("d MMM yyyy")</text>
+            }
+        </span>
+    </div>
+</div>
+
+@if (Model.HasActiveFilters)
+{
+    <div class="active-filters">
+        @if (!string.IsNullOrWhiteSpace(Model.Location))
+        {
+            var route = SearchRoute.With(Model, "location", null);
+            <span class="filter-tag">
+                @Model.Location
+                <a asp-controller="Home" asp-action="Index" asp-all-route-data="route">&times;</a>
+            </span>
+        }
+
+        @if (Model.CategoryID.HasValue)
+        {
+            var catName = Model.Categories.FirstOrDefault(c => c.CategoryID == Model.CategoryID)?.CategoryName;
+            var route = SearchRoute.With(Model, "categoryID", null);
+            <span class="filter-tag">
+                @catName
+                <a asp-controller="Home" asp-action="Index" asp-all-route-data="route">&times;</a>
+            </span>
+        }
+
+        @if (Model.Bedrooms.HasValue)
+        {
+            var route = SearchRoute.With(Model, "bedrooms", null);
+            <span class="filter-tag">
+                @Model.Bedrooms+ bedrooms
+                <a asp-controller="Home" asp-action="Index" asp-all-route-data="route">&times;</a>
+            </span>
+        }
+
+        @if (Model.MinPrice.HasValue || Model.MaxPrice.HasValue)
+        {
+            var route = SearchRoute.Without(Model, "minPrice", "maxPrice");
+            var lowLabel = Model.MinPrice.HasValue ? Model.MinPrice.Value.ToString("N0") : "0";
+            var highLabel = Model.MaxPrice.HasValue ? Model.MaxPrice.Value.ToString("N0") : "any";
+            <span class="filter-tag">
+                RM @lowLabel &ndash; @highLabel
+                <a asp-controller="Home" asp-action="Index" asp-all-route-data="route">&times;</a>
+            </span>
+        }
+
+        @if (Model.MinScore.HasValue)
+        {
+            var route = SearchRoute.With(Model, "minScore", null);
+            <span class="filter-tag">
+                Score @Model.MinScore+
+                <a asp-controller="Home" asp-action="Index" asp-all-route-data="route">&times;</a>
+            </span>
+        }
+
+        @foreach (var amenityId in Model.AmenityIDs)
+        {
+            var amenityName = Model.Amenities.FirstOrDefault(a => a.AmenityID == amenityId)?.AmenityName;
+            var route = SearchRoute.WithAmenities(Model, Model.AmenityIDs.Where(a => a != amenityId).ToArray());
+            <span class="filter-tag">
+                @amenityName
+                <a asp-controller="Home" asp-action="Index" asp-all-route-data="route">&times;</a>
+            </span>
+        }
+    </div>
+}
+
+<div class="sortbar">
+    @foreach (var option in sortOptions)
+    {
+        var sortRoute = SearchRoute.With(Model, "sortBy", option.Key == "recommended" ? null : option.Key);
+        <a class="sort-tab @(Model.SortBy == option.Key ? "active" : "")"
+           asp-controller="Home" asp-action="Index" asp-all-route-data="sortRoute">@option.Label</a>
+    }
+</div>
+
+@if (Model.TotalResults == 0)
+{
+    <div class="empty-state">
+        <div class="icon">&#128269;</div>
+        <h3>No properties matched your search</h3>
+        <p>Try widening the price range, removing a facility, or searching a different area.</p>
+        <a class="btn-outline" asp-controller="Home" asp-action="Index">Clear all filters</a>
+    </div>
+}
+
+<div class="result-list">
+    @foreach (var property in Model.Results)
+    {
+        <article class="result-card">
+            <div class="rc-photo">
+                @if (!string.IsNullOrEmpty(property.PrimaryPhotoPath))
+                {
+                    <img src="@property.PrimaryPhotoPath" alt="@property.Title" loading="lazy" />
+                }
+                else
+                {
+                    <span class="photo-empty">&#127968;</span>
+                }
+
+                @if (property.IsGreatValue)
+                {
+                    <span class="ribbon ribbon-value">Great value</span>
+                }
+                else if (property.IsNewListing)
+                {
+                    <span class="ribbon ribbon-new">New listing</span>
+                }
+            </div>
+
+            <div class="rc-body">
+                <a class="rc-title" asp-controller="Property" asp-action="Details" asp-route-id="@property.PropertyID">@property.Title</a>
+
+                <div class="rc-meta">
+                    @if (!string.IsNullOrEmpty(property.CategoryName))
+                    {
+                        <span class="type-tag">@property.CategoryName</span>
+                    }
+                    <span>&#128205; @property.City</span>
+                    <span>&middot;</span>
+                    <span>@property.NumBedrooms bed &middot; @property.NumBathrooms bath</span>
+                </div>
+
+                <div class="score-line">
+                    @if (property.ReviewCount > 0)
+                    {
+                        var reviewLabel = $"{property.ReviewCount} tenant review{(property.ReviewCount == 1 ? "" : "s")}";
+                        <span class="score-badge">@property.ReviewScore.ToString("0.0")</span>
+                        <span class="score-text">
+                            <span class="score-word">@property.ScoreWord</span>
+                            <span class="score-count">@reviewLabel</span>
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="score-badge is-empty">New</span>
+                        <span class="score-text">
+                            <span class="score-word">No reviews yet</span>
+                            <span class="score-count">Be the first to rent and review</span>
+                        </span>
+                    }
+                </div>
+
+                @if (property.AmenityNames.Any())
+                {
+                    <div class="amenity-chips">
+                        @foreach (var amenity in property.AmenityNames.Take(4))
+                        {
+                            <span class="amenity-chip">@amenity</span>
+                        }
+                        @if (property.AmenityNames.Count > 4)
+                        {
+                            <span class="amenity-chip more">+@(property.AmenityNames.Count - 4) more</span>
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="rc-price">
+                @if (property.DiscountPercent >= 5)
+                {
+                    <span class="save-tag">@property.DiscountPercent% below area average</span>
+                    <span class="price-was">RM @property.ComparablePrice.ToString("N0")</span>
+                }
+                else if (property.IsNewListing)
+                {
+                    <span class="urgency">Just listed</span>
+                }
+
+                <div class="price-now">RM @property.RentPrice.ToString("N0") <small>/ month</small></div>
+                <span class="price-note">+ RM @property.Deposit.ToString("N0") refundable deposit</span>
+
+                <a class="btn-see" asp-controller="Property" asp-action="Details" asp-route-id="@property.PropertyID">See availability</a>
+            </div>
+        </article>
+    }
+</div>
+
+@if (Model.TotalPages > 1)
+{
+    <nav class="pagination" aria-label="Search results pages">
+        @if (Model.Page > 1)
+        {
+            var prev = SearchRoute.WithPage(Model, Model.Page - 1);
+            <a class="page-link page-nav" rel="prev"
+               asp-controller="Home" asp-action="Index" asp-all-route-data="prev">&larr; Prev</a>
+        }
+        else
+        {
+            <span class="page-link page-nav is-disabled">&larr; Prev</span>
+        }
+
+        @{
+            // Windowed page numbers: first, last, and the pages either side of the current one.
+            var pages = new List<int>();
+            for (var i = 1; i <= Model.TotalPages; i++)
+            {
+                if (i == 1 || i == Model.TotalPages || (i >= Model.Page - 1 && i <= Model.Page + 1))
+                {
+                    pages.Add(i);
+                }
+            }
+            var previous = 0;
+        }
+        @foreach (var p in pages)
+        {
+            if (previous != 0 && p - previous > 1)
+            {
+                <span class="page-gap">&hellip;</span>
+            }
+            if (p == Model.Page)
+            {
+                <span class="page-link is-current" aria-current="page">@p</span>
+            }
+            else
+            {
+                var route = SearchRoute.WithPage(Model, p);
+                <a class="page-link" asp-controller="Home" asp-action="Index" asp-all-route-data="route">@p</a>
+            }
+            previous = p;
+        }
+
+        @if (Model.Page < Model.TotalPages)
+        {
+            var next = SearchRoute.WithPage(Model, Model.Page + 1);
+            <a class="page-link page-nav" rel="next"
+               asp-controller="Home" asp-action="Index" asp-all-route-data="next">Next &rarr;</a>
+        }
+        else
+        {
+            <span class="page-link page-nav is-disabled">Next &rarr;</span>
+        }
+    </nav>
+}

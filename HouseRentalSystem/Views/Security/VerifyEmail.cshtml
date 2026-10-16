@@ -1,0 +1,52 @@
+@model HouseRentalSystem.Models.VerifyEmailViewModel
+@{
+    ViewData["Title"] = "Verify your email";
+}
+
+<div class="container page-section" style="max-width:440px;">
+    <div class="checkout-card">
+        <h1 style="font-size:21px; margin:0 0 4px; text-align:center;">Verify your email</h1>
+        <p style="font-size:13px; color:var(--text-secondary); text-align:center; margin:0 0 22px;">
+            We sent a 6-digit code to <strong>@Model.Email</strong>. Enter it below to activate your account.
+        </p>
+
+        @if (TempData["VerifyInfo"] != null)
+        {
+            <div class="toast" style="margin:0 0 16px; background:var(--accent-value-bg); border-color:#B9E3D5; color:var(--accent-value);">
+                @TempData["VerifyInfo"]
+            </div>
+        }
+        @if (TempData["VerifyError"] != null)
+        {
+            <div class="toast" style="margin:0 0 16px;">
+                @TempData["VerifyError"]
+            </div>
+        }
+
+        <form asp-controller="Security" asp-action="VerifyEmail" method="post">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <input type="hidden" asp-for="Email" />
+
+            <div class="form-row">
+                <label asp-for="Code">Verification code</label>
+                <input asp-for="Code" placeholder="123456" autocomplete="one-time-code" maxlength="6" />
+                <span asp-validation-for="Code" class="text-danger"></span>
+            </div>
+
+            <button type="submit" class="btn-primary">Verify email</button>
+        </form>
+
+        <form asp-controller="Security" asp-action="ResendVerificationCode" method="post" style="margin-top:12px;">
+            <input type="hidden" name="email" value="@Model.Email" />
+            <button type="submit" class="btn-outline" style="width:100%;">Resend code</button>
+        </form>
+
+        <p style="text-align:center; font-size:13px; margin-top:18px; color:var(--text-secondary);">
+            Already verified? <a asp-controller="Security" asp-action="Login">Sign in</a>
+        </p>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -1,0 +1,67 @@
+@model List<HouseRentalSystem.Models.AgreementRequest>
+@using HouseRentalSystem.Models
+@{
+    ViewData["Title"] = "My requests";
+
+    string StatusClass(RequestStatus status) => status switch
+    {
+        RequestStatus.Approved => "status-approved",
+        RequestStatus.Rejected => "status-rejected",
+        _ => "status-pending"
+    };
+}
+
+<div class="container page-section" style="max-width:760px;">
+
+    <div class="results-head">
+        <div>
+            <h1>My requests</h1>
+            <span class="result-count">@Model.Count request@(Model.Count == 1 ? "" : "s")</span>
+        </div>
+    </div>
+
+    @if (!Model.Any())
+    {
+        <div class="empty-state">
+            <div class="icon">&#128203;</div>
+            <h3>No requests yet</h3>
+            <p>Cancellation and refund requests you raise on a tenancy will show up here.</p>
+        </div>
+    }
+
+    @foreach (var request in Model)
+    {
+        var property = request.Agreement?.Application?.Property;
+        <div class="checkout-card" style="margin-bottom:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+                <div>
+                    <div style="font-size:16px; font-weight:700;">@request.RequestType</div>
+                    <div style="font-size:13px; color:var(--text-secondary);">@property?.Title &middot; @property?.City</div>
+                </div>
+                <span class="status-pill @StatusClass(request.Status)">@request.Status</span>
+            </div>
+            <p style="margin:12px 0 0; font-size:14px; color:var(--text-secondary);">@request.Reason</p>
+            @if (request.RequestedAmount.HasValue)
+            {
+                <div style="margin-top:8px; font-size:13px;">
+                    Requested: RM @request.RequestedAmount.Value.ToString("N2")
+                    @if (request.ApprovedAmount.HasValue)
+                    {
+                        @:&middot; Approved: RM @request.ApprovedAmount.Value.ToString("N2")
+                    }
+                </div>
+            }
+            @if (!string.IsNullOrEmpty(request.AdminNote))
+            {
+                <div class="field-hint" style="margin-top:8px;">Admin note: @request.AdminNote</div>
+            }
+            <div style="margin-top:12px; font-size:12px; color:var(--text-muted);">
+                Submitted @request.SubmittedDate.ToString("d MMM yyyy")
+                @if (request.DecidedDate.HasValue)
+                {
+                    @:&middot; Decided @request.DecidedDate.Value.ToString("d MMM yyyy")
+                }
+            </div>
+        </div>
+    }
+</div>

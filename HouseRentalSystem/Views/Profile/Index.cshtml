@@ -1,0 +1,89 @@
+@model HouseRentalSystem.Models.UpdateProfileViewModel
+@{
+    ViewData["Title"] = "My profile";
+    var initials = string.IsNullOrWhiteSpace(Model.FullName)
+        ? "?"
+        : string.Concat(Model.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(p => p[0]));
+}
+
+<div class="container page-section" style="max-width:640px;">
+
+    <div class="results-head">
+        <div>
+            <h1>My profile</h1>
+            <span class="result-count">Manage your account details and photo</span>
+        </div>
+    </div>
+
+    <div class="checkout-card">
+        <h2 class="section-title" style="margin-bottom:14px;">Profile picture</h2>
+        <div style="display:flex; align-items:center; gap:18px; flex-wrap:wrap;">
+            @if (!string.IsNullOrEmpty(Model.ProfilePhoto))
+            {
+                <img src="@Model.ProfilePhoto" alt="Profile picture"
+                     style="width:88px; height:88px; border-radius:50%; object-fit:cover; border:1px solid var(--border-color);" />
+            }
+            else
+            {
+                <span class="avatar" style="width:88px; height:88px; font-size:28px;">@initials</span>
+            }
+
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <form asp-controller="Profile" asp-action="UploadPhoto" method="post" enctype="multipart/form-data"
+                      style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                    <input type="file" name="photo" accept=".jpg,.jpeg,.png,.webp,.gif" required />
+                    <button type="submit" class="btn-outline btn-inline" style="margin-top:0;">Upload</button>
+                </form>
+                @if (!string.IsNullOrEmpty(Model.ProfilePhoto))
+                {
+                    <form asp-controller="Profile" asp-action="RemovePhoto" method="post"
+                          onsubmit="return confirm('Remove your profile picture?');">
+                        <button type="submit" class="btn-outline btn-inline" style="margin-top:0; color:var(--accent-urgent); border-color:var(--accent-urgent);">Remove photo</button>
+                    </form>
+                }
+                <div class="field-hint">JPG, PNG, GIF or WEBP. Up to 5 MB.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="checkout-card" style="margin-top:16px;">
+        <h2 class="section-title" style="margin-bottom:14px;">Personal details</h2>
+        <form asp-controller="Profile" asp-action="UpdateDetails" method="post">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+            <div class="form-row">
+                <label>Email</label>
+                <input value="@Model.Email" disabled />
+                <div class="field-hint">Your sign-in email can't be changed here.</div>
+            </div>
+
+            <div class="form-row">
+                <label asp-for="FullName">Full name</label>
+                <input asp-for="FullName" />
+                <span asp-validation-for="FullName" class="text-danger"></span>
+            </div>
+
+            <div class="form-grid-2">
+                <div class="form-row">
+                    <label asp-for="Phone">Phone number</label>
+                    <input asp-for="Phone" placeholder="e.g. 012-3456789" />
+                    <span asp-validation-for="Phone" class="text-danger"></span>
+                </div>
+                <div class="form-row">
+                    <label asp-for="DateOfBirth">Date of birth</label>
+                    <input asp-for="DateOfBirth" type="date" />
+                    <span asp-validation-for="DateOfBirth" class="text-danger"></span>
+                </div>
+            </div>
+
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <button type="submit" class="btn-primary" style="margin-top:0;">Update personal details</button>
+                <a class="btn-outline btn-inline" style="margin-top:0;" asp-controller="Profile" asp-action="ChangePassword">Change password</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

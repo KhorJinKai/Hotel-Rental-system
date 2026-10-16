@@ -1,0 +1,86 @@
+@model List<HouseRentalSystem.Models.User>
+@using HouseRentalSystem.Models
+@using System.Security.Claims
+@{
+    ViewData["Title"] = "Manage users";
+    var search = ViewBag.Search as string;
+    var selectedRole = ViewBag.Role as UserRole?;
+    var currentAdminId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+}
+
+<div class="container page-section">
+
+    <div class="results-head">
+        <div>
+            <h1>Manage users</h1>
+            <span class="result-count">@Model.Count account@(Model.Count == 1 ? "" : "s")</span>
+        </div>
+        <a class="btn-outline" asp-controller="Admin" asp-action="Index">Back to dashboard</a>
+    </div>
+
+    <form method="get" asp-controller="Admin" asp-action="Users" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px;">
+        <input type="text" name="search" value="@search" placeholder="Search by name or email" style="flex:1; min-width:220px;" />
+        <select name="role" style="min-width:160px;">
+            <option value="">All roles</option>
+            @foreach (var r in Enum.GetValues<UserRole>())
+            {
+                <option value="@r" selected="@(selectedRole == r)">@r</option>
+            }
+        </select>
+        <button type="submit" class="btn-outline btn-inline" style="margin-top:0;">Filter</button>
+    </form>
+
+    <div class="checkout-card">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Joined</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var user in Model)
+                {
+                    var isSelf = user.UserID.ToString() == currentAdminId;
+                    <tr>
+                        <td><strong>@user.FullName</strong></td>
+                        <td>@user.Email</td>
+                        <td>@user.Role</td>
+                        <td>
+                            <span class="status-pill @(user.IsActive ? "status-approved" : "status-rejected")">
+                                @(user.IsActive ? "Active" : "Blocked")
+                            </span>
+                            @if (user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTime.Now)
+                            {
+                                <span class="status-pill status-pending">Locked out</span>
+                            }
+                        </td>
+                        <td>@user.CreatedDate.ToString("d MMM yyyy")</td>
+                        <td>
+                            @if (isSelf)
+                            {
+                                <span style="font-size:12px; color:var(--text-muted);">This is you</span>
+                            }
+                            else
+                            {
+                                <form asp-controller="Admin" asp-action="ToggleUserActive" asp-route-id="@user.UserID" method="post">
+                                    <button type="submit" class="btn-outline btn-inline" style="margin-top:0; @(user.IsActive ? "color:var(--accent-urgent); border-color:var(--accent-urgent);" : "")">
+                                        @(user.IsActive ? "Block" : "Unblock")
+                                    </button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+                @if (!Model.Any())
+                {
+                    <tr><td colspan="6" style="text-align:center; color:var(--text-muted);">No accounts match your search.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

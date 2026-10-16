@@ -1,0 +1,596 @@
+@using System.Security.Claims
+@using HouseRentalSystem.Models
+@using HouseRentalSystem.Services
+@model HouseRentalSystem.Models.RentalAgreement
+@{
+    ViewData["Title"] = "Rental agreement";
+    var property = Model.Application.Property;
+    var owner = property.Owner;
+    var tenant = Model.Application.Tenant;
+    var isTenant = User.IsInRole("Tenant") && User.FindFirstValue(ClaimTypes.NameIdentifier) == tenant.UserID.ToString();
+    // Distinguishes a tenancy that actually went ahead (even if since terminated) from one
+    // rejected before ever being approved - Application.Status stays Approved forever once
+    // set, regardless of what later happens to the agreement, so it's a reliable marker.
+    var wasEverApproved = Model.Application.Status == ApplicationStatus.Approved;
+    var termMonths = Model.Application.RentalDurationMonths;
+    var mapsUrl = "https://www.google.com/maps/search/?api=1&query=" + Uri.EscapeDataString($"{property.Address}, {property.City}");
+    // Deposits are normally quoted as a multiple of the monthly rent, so express it that way
+    // when it divides cleanly (e.g. "2 months' rent") and omit the phrase when it doesn't.
+    var depositMultiple = Model.MonthlyRent > 0 ? Model.DepositAmount / Model.MonthlyRent : 0m;
+    var depositInMonths = depositMultiple == Math.Floor(depositMultiple) && depositMultiple > 0
+        ? $" (equivalent to {depositMultiple:0} month{(depositMultiple == 1 ? "" : "s")}' rent)"
+        : string.Empty;
+    string StatusClass(PaymentStatus status) => status switch
+    {
+        PaymentStatus.Paid => "status-approved",
+        PaymentStatus.Overdue => "status-rejected",
+        _ => "status-pending"
+    };
+
+    string PaymentLabel(Payment p) => p.PaymentType switch
+    {
+        PaymentType.Deposit => "Security deposit",
+        PaymentType.Compound => "Late payment compound",
+        PaymentType.Refund => "Refund",
+        _ => $"Rent — month {p.RentMonthNumber}"
+    };
+
+    string NoticeClass(ArrearsNoticeType type) => type switch
+    {
+        ArrearsNoticeType.Reminder => "notice-reminder",
+        ArrearsNoticeType.DepositDeduction => "notice-deduction",
+        ArrearsNoticeType.Termination => "notice-termination",
+        _ => "notice-compound"
+    };
+
+    string NoticeTitle(ArrearsNoticeType type) => type switch
+    {
+        ArrearsNoticeType.Reminder => "Payment reminder",
+        ArrearsNoticeType.DepositDeduction => "Deposit deduction",
+        ArrearsNoticeType.Termination => "Tenancy terminated",
+        _ => "Compound issued"
+    };
+
+    var hasOverdueCompound = Model.Payments
+        .Any(p => p.PaymentType == PaymentType.Compound && p.PaymentStatus == PaymentStatus.Overdue);
+
+    var outstanding = Model.Payments
+        .Where(p => p.PaymentStatus != PaymentStatus.Paid)
+        .Sum(p => p.Amount);
+
+    var arrears = ViewBag.ArrearsSummary as ArrearsSummary;
+    var isOwnerView = ViewBag.IsOwnerView is bool ov && ov;
+    var myReview = isTenant
+        ? (Model.Reviews ?? new List<Review>()).FirstOrDefault(r => r.ReviewerID == tenant.UserID)
+        : null;
+    var notices = (Model.ArrearsNotices ?? new List<ArrearsNotice>())
+        .OrderByDescending(n => n.IssuedDate).ThenByDescending(n => n.ArrearsNoticeID)
+        .ToList();
+
+    // Deposit, then rent month by month, then any compounds - the order the tenant pays in.
+    var schedule = Model.Payments
+        .OrderBy(p => p.PaymentType == PaymentType.Deposit ? 0 : p.PaymentType == PaymentType.Rent ? 1 : 2)
+        .ThenBy(p => p.DueDate)
+        .ThenBy(p => p.PaymentID)
+        .ToList();
+
+    // Rent must be paid oldest month first - only this month's "Pay" button is live; later
+    // unpaid months are locked until it clears (enforced again in PaymentController.Checkout).
+    var earliestUnpaidRentMonth = Model.Payments
+        .Where(p => p.PaymentType == PaymentType.Rent && p.PaymentStatus != PaymentStatus.Paid)
+        .OrderBy(p => p.RentMonthNumber)
+        .Select(p => (int?)p.RentMonthNumber)
+        .FirstOrDefault();
+}
+
+<div class="container page-section" style="max-width:800px;">
+
+    <div class="results-head">
+        <div>
+            <h1>Rental agreement</h1>
+            <span class="result-count">Agreement #@Model.AgreementID &middot; @termMonths month term</span>
+        </div>
+        <span class="status-pill @(Model.Status == AgreementStatus.Terminated ? "status-rejected" : Model.Status == AgreementStatus.PendingApproval ? "status-pending" : outstanding > 0 ? "status-pending" : "status-approved")">
+            @(Model.Status == AgreementStatus.Terminated ? "Terminated" : Model.Status == AgreementStatus.PendingApproval ? "Awaiting approval" : outstanding > 0 ? $"RM {outstanding:N0} outstanding" : "Fully paid")
+        </span>
+    </div>
+
+    <div class="checkout-card">
+        <div style="padding-bottom:18px; border-bottom:1px solid var(--border-color);">
+            <h2 class="section-title" style="margin-bottom:8px;">Property</h2>
+            <p style="font-weight:700; margin:0 0 2px;">@property.Title</p>
+            <p style="font-size:14px; margin:0;">&#128205; <a href="@mapsUrl" target="_blank" rel="noopener noreferrer">@property.Address, @property.City</a></p>
+        </div>
+
+        <div class="form-grid-2" style="margin:20px 0; padding:0 0 20px; border-bottom:1px solid var(--border-color);">
+            <div>
+                <h2 class="section-title" style="font-size:15px;">Owner</h2>
+                <p style="font-size:14px; margin-bottom:2px;">@owner.FullName</p>
+                <p style="font-size:13px; color:var(--text-secondary);">@owner.Email</p>
+                <p style="font-size:13px; color:var(--text-secondary);">@owner.Phone</p>
+            </div>
+            <div>
+                <h2 class="section-title" style="font-size:15px;">Tenant</h2>
+                <p style="font-size:14px; margin-bottom:2px;">@tenant.FullName</p>
+                <p style="font-size:13px; color:var(--text-secondary);">@tenant.Email</p>
+                <p style="font-size:13px; color:var(--text-secondary);">@tenant.Phone</p>
+            </div>
+        </div>
+
+        <div class="price-breakdown" style="border-top:none; padding-top:0; margin-top:0;">
+            <div class="row"><span>Lease start</span><span>@Model.StartDate.ToString("d MMM yyyy")</span></div>
+            <div class="row"><span>Lease end</span><span>@Model.EndDate.ToString("d MMM yyyy")</span></div>
+            <div class="row"><span>Monthly rent</span><span>RM @Model.MonthlyRent.ToString("N0")</span></div>
+            <div class="row"><span>Security deposit</span><span>RM @Model.DepositAmount.ToString("N0")</span></div>
+            <div class="row total">
+                <span>Deposit remaining</span>
+                <span style="@(Model.DepositBalance < Model.DepositAmount ? "color:var(--accent-urgent);" : "")">
+                    RM @Model.DepositBalance.ToString("N0")
+                </span>
+            </div>
+        </div>
+    </div>
+
+    @if (Model.Status == AgreementStatus.PendingApproval)
+    {
+        var accepted = Model.Application.TermsAcceptedDate.HasValue;
+        var depositPayment = Model.Payments.FirstOrDefault(p => p.PaymentType == PaymentType.Deposit);
+        var depositPaid = depositPayment?.PaymentStatus == PaymentStatus.Paid;
+
+        <div class="checkout-card" style="margin-top:16px; border-color:var(--brand-primary-mid);">
+            @if (!isTenant)
+            {
+                <h2 class="section-title">Awaiting the tenant</h2>
+                <p class="section-subtitle">
+                    @(accepted
+                        ? "The tenant has accepted the agreement below and is paying the security deposit. This request is sent to you for review as soon as it clears."
+                        : "The tenant hasn't yet accepted the tenancy agreement below or paid the security deposit. You'll see this request once they do.")
+                </p>
+            }
+            else if (!accepted)
+            {
+                <h2 class="section-title">Read and accept the agreement</h2>
+                <p class="section-subtitle">
+                    Review the full tenancy agreement below, then tick the box to confirm you agree to its terms.
+                    Your booking request isn't sent to the owner until you've accepted and paid the security deposit.
+                </p>
+                <form asp-controller="RentalApplication" asp-action="AcceptTerms" asp-route-id="@Model.ApplicationID" method="post">
+                    <label style="display:flex; align-items:flex-start; gap:10px; font-size:13.5px; cursor:pointer;">
+                        <input type="checkbox" name="agree" value="true" required style="width:auto; margin-top:3px;" />
+                        <span>I have read and agree to the tenancy agreement set out below.</span>
+                    </label>
+                    <button type="submit" class="btn-primary" style="margin-top:14px;">I agree - continue</button>
+                </form>
+            }
+            else if (!depositPaid)
+            {
+                <h2 class="section-title">Pay the security deposit</h2>
+                <p class="section-subtitle">
+                    You've accepted the agreement. Pay the RM @Model.DepositAmount.ToString("N0") security deposit
+                    to send your booking request to the owner.
+                </p>
+                <form asp-controller="Payment" asp-action="Checkout" asp-route-id="@depositPayment!.PaymentID" method="post">
+                    <button type="submit" class="btn-primary">Pay security deposit</button>
+                </form>
+            }
+            else
+            {
+                <h2 class="section-title">Waiting for approval</h2>
+                <p class="section-subtitle">
+                    Your deposit has been received. This request is now with the owner, then our team, for final approval.
+                </p>
+            }
+        </div>
+    }
+
+    @if (arrears != null && arrears.MonthsMissed > 0)
+    {
+        <div class="arrears-banner @(arrears.MonthsMissed >= ArrearsPolicy.CompoundStage ? "level-3" : arrears.MonthsMissed >= ArrearsPolicy.DepositDeductionStage ? "level-2" : "level-1")">
+            <div class="arrears-head">
+                <strong>
+                    @arrears.MonthsMissed month@(arrears.MonthsMissed == 1 ? "" : "s") of rent missed
+                    &middot; @arrears.Stage
+                </strong>
+                @if (arrears.OldestOverdueDate.HasValue)
+                {
+                    <span>Oldest unpaid instalment fell due @arrears.OldestOverdueDate.Value.ToString("d MMM yyyy")</span>
+                }
+            </div>
+            <div class="arrears-figures">
+                <div><span class="k">Rent outstanding</span><span class="v">RM @arrears.OutstandingRent.ToString("N0")</span></div>
+                <div><span class="k">Deducted from deposit</span><span class="v">RM @arrears.DepositDeducted.ToString("N0")</span></div>
+                <div><span class="k">Compounds outstanding</span><span class="v">RM @arrears.OutstandingCompounds.ToString("N0")</span></div>
+            </div>
+            <p class="arrears-next">
+                @if (arrears.MonthsMissed < ArrearsPolicy.DepositDeductionStage)
+                {
+                    <text>If this rent is still unpaid after a second month, it will be deducted from the security deposit.</text>
+                }
+                else if (arrears.MonthsMissed < ArrearsPolicy.CompoundStage)
+                {
+                    <text>A third missed month will attract a compound of @((ArrearsPolicy.CompoundRate * 100).ToString("0"))% of the rent outstanding (minimum RM @ArrearsPolicy.MinimumCompound.ToString("N0")).</text>
+                }
+                else
+                {
+                    <text>A compound has been issued. Continued non-payment entitles the Landlord to terminate the tenancy under clause 3.</text>
+                }
+            </p>
+            @if (isOwnerView && Model.Status == AgreementStatus.Active)
+            {
+                <p class="arrears-next" style="margin-top:12px;">
+                    Reminders are sent to the tenant automatically for each missed month.
+                </p>
+                @if (hasOverdueCompound)
+                {
+                    <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;">
+                        <form asp-action="TerminateForArrears" asp-route-id="@Model.AgreementID" method="post"
+                              onsubmit="return confirm('Terminate this tenancy for non-payment? This cannot be undone.');">
+                            <button type="submit" class="btn-primary btn-inline" style="background:var(--accent-urgent); border-color:var(--accent-urgent);">Terminate tenancy</button>
+                        </form>
+                    </div>
+                }
+            }
+        </div>
+    }
+
+    <div class="checkout-card" style="margin-top:16px;">
+        <h2 class="section-title">Payment schedule</h2>
+        <p class="section-subtitle">
+            Rent is payable in advance on each due date, with @ArrearsPolicy.GraceDays days' grace.
+            Payments are processed securely by Stripe. RentEasy never stores your card details.
+        </p>
+
+        @foreach (var payment in schedule)
+        {
+            var daysLate = payment.PaymentStatus == PaymentStatus.Overdue
+                ? (int)(DateTime.Today - payment.DueDate.Date).TotalDays
+                : 0;
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--border-color);">
+                <div>
+                    <div style="font-weight:600; font-size:14px;">@PaymentLabel(payment)</div>
+                    <div style="font-size:13px; color:var(--text-secondary);">
+                        RM @payment.Amount.ToString("N0") &middot; due @payment.DueDate.ToString("d MMM yyyy")
+                    </div>
+                    @if (daysLate > 0)
+                    {
+                        <div style="font-size:12px; color:var(--accent-urgent); margin-top:2px;">
+                            @daysLate day@(daysLate == 1 ? "" : "s") late
+                        </div>
+                    }
+                    @if (payment.SettledFromDeposit)
+                    {
+                        <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">
+                            Cleared from the security deposit on @payment.PaymentDate?.ToString("d MMM yyyy")
+                        </div>
+                    }
+                    else if (payment.PaymentStatus == PaymentStatus.Paid && !string.IsNullOrEmpty(payment.ReceiptPath))
+                    {
+                        <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Stripe ref: @payment.ReceiptPath</div>
+                    }
+                </div>
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <span class="status-pill @(payment.SettledFromDeposit ? "status-neutral" : StatusClass(payment.PaymentStatus))">
+                        @(payment.SettledFromDeposit ? "From deposit" : payment.PaymentStatus.ToString())
+                    </span>
+                    @if (isTenant && payment.PaymentStatus != PaymentStatus.Paid && Model.Status == AgreementStatus.Active)
+                    {
+                        var lockedByEarlierRent = payment.PaymentType == PaymentType.Rent
+                            && earliestUnpaidRentMonth.HasValue
+                            && payment.RentMonthNumber > earliestUnpaidRentMonth.Value;
+
+                        if (lockedByEarlierRent)
+                        {
+                            <span style="font-size:12px; color:var(--text-muted); text-align:right; max-width:140px;">
+                                Pay month @earliestUnpaidRentMonth first
+                            </span>
+                        }
+                        else
+                        {
+                            <form asp-controller="Payment" asp-action="Checkout" asp-route-id="@payment.PaymentID" method="post">
+                                <button type="submit" class="btn-primary btn-inline" style="margin-top:0;">Pay with card</button>
+                            </form>
+                        }
+                    }
+                    @if (payment.PaymentStatus == PaymentStatus.Paid)
+                    {
+                        <a class="btn-outline btn-inline" style="margin-top:0;"
+                           asp-controller="Payment" asp-action="Receipt" asp-route-id="@payment.PaymentID">View receipt</a>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    @{
+        var agreementRequests = (Model.AgreementRequests ?? new List<AgreementRequest>())
+            .OrderByDescending(r => r.SubmittedDate)
+            .ToList();
+        var hasPendingCancellation = agreementRequests.Any(r => r.RequestType == RequestType.Cancellation && r.Status == RequestStatus.Pending);
+        var hasPendingRefund = agreementRequests.Any(r => r.RequestType == RequestType.Refund && r.Status == RequestStatus.Pending);
+
+        string RequestStatusClass(RequestStatus s) => s switch
+        {
+            RequestStatus.Approved => "status-approved",
+            RequestStatus.Rejected => "status-rejected",
+            _ => "status-pending"
+        };
+    }
+
+    @if (wasEverApproved)
+    {
+        <div class="checkout-card" style="margin-top:16px;">
+            <h2 class="section-title">Cancellation &amp; refunds</h2>
+            <p class="section-subtitle">Every request here needs an admin's approval before it takes effect.</p>
+
+            <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:@(agreementRequests.Any() ? "16px" : "0")">
+                @if (Model.Status == AgreementStatus.Active && !hasPendingCancellation)
+                {
+                    <a class="btn-outline btn-inline" style="margin-top:0;"
+                       asp-controller="AgreementRequest" asp-action="Create"
+                       asp-route-agreementId="@Model.AgreementID" asp-route-type="Cancellation">Request cancellation</a>
+                }
+                @if (isTenant && !hasPendingRefund && Model.Status == AgreementStatus.Active)
+                {
+                    <a class="btn-outline btn-inline" style="margin-top:0;"
+                       asp-controller="AgreementRequest" asp-action="Create"
+                       asp-route-agreementId="@Model.AgreementID" asp-route-type="Refund">Request refund</a>
+                }
+            </div>
+
+            @foreach (var request in agreementRequests)
+            {
+                <div style="padding:12px 0; border-top:1px solid var(--border-color);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+                        <strong style="font-size:14px;">@request.RequestType</strong>
+                        <span class="status-pill @RequestStatusClass(request.Status)">@request.Status</span>
+                    </div>
+                    <p style="margin:6px 0 0; font-size:13px; color:var(--text-secondary);">@request.Reason</p>
+                    @if (request.RequestedAmount.HasValue)
+                    {
+                        <div style="margin-top:4px; font-size:12px; color:var(--text-muted);">
+                            Requested RM @request.RequestedAmount.Value.ToString("N2")
+                            @if (request.ApprovedAmount.HasValue)
+                            {
+                                @:&middot; Approved RM @request.ApprovedAmount.Value.ToString("N2")
+                            }
+                        </div>
+                    }
+                    @if (!string.IsNullOrEmpty(request.AdminNote))
+                    {
+                        <div class="field-hint" style="margin-top:4px;">Admin note: @request.AdminNote</div>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    @if (isTenant && Model.Status == AgreementStatus.Active)
+    {
+        <div class="checkout-card" style="margin-top:16px;">
+            <h2 class="section-title">Maintenance</h2>
+            <p class="section-subtitle">Something broken or not working at @property.Title?</p>
+            <a class="btn-outline btn-inline" asp-controller="Maintenance" asp-action="Create" asp-route-propertyId="@property.PropertyID">Report a maintenance issue</a>
+        </div>
+    }
+
+    @if (isTenant && wasEverApproved)
+    {
+        <div class="checkout-card" style="margin-top:16px;">
+            <h2 class="section-title">Your review</h2>
+            @if (myReview != null)
+            {
+                <div class="rating" style="margin-bottom:6px;">
+                    @for (int s = 0; s < myReview.Rating; s++)
+                    {
+                        <span class="star">&#9733;</span>
+                    }
+                    <span style="color:var(--text-muted); margin-left:4px;">@myReview.ReviewDate.ToString("d MMM yyyy")</span>
+                </div>
+                <p style="margin:0; color:var(--text-secondary); font-size:14px;">@myReview.Comment</p>
+            }
+            else
+            {
+                <p class="section-subtitle">Let other tenants know what your stay at @property.Title was like.</p>
+                <a class="btn-outline btn-inline" asp-controller="Review" asp-action="Create" asp-route-agreementId="@Model.AgreementID">Write a review</a>
+            }
+        </div>
+    }
+
+    @if (notices.Any())
+    {
+        <div class="checkout-card" style="margin-top:16px;">
+            <h2 class="section-title">Late rent notices</h2>
+            <p class="section-subtitle">
+                Every step taken on this tenancy after a rent instalment was missed, in date order.
+            </p>
+
+            @foreach (var notice in notices)
+            {
+                <div class="arrears-notice @NoticeClass(notice.NoticeType)">
+                    <div class="notice-head">
+                        <strong>@NoticeTitle(notice.NoticeType)</strong>
+                        <span>@notice.IssuedDate.ToString("d MMM yyyy")</span>
+                    </div>
+                    <p>@notice.Details</p>
+                    @if (notice.Amount > 0)
+                    {
+                        <span class="notice-amount">RM @notice.Amount.ToString("N2")</span>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    <div class="checkout-card" style="margin-top:16px;">
+        <h2 class="section-title">Terms &amp; conditions</h2>
+        <p style="font-size:12px; color:var(--text-muted); margin-bottom:18px; line-height:1.6;">
+            This tenancy is granted by <strong style="color:var(--text-secondary);">@owner.FullName</strong> (&ldquo;the Landlord&rdquo;)
+            to <strong style="color:var(--text-secondary);">@tenant.FullName</strong> (&ldquo;the Tenant&rdquo;)
+            in respect of the property at @property.Address, @property.City (&ldquo;the Property&rdquo;), on the terms set out below.
+        </p>
+
+        <ol class="agreement-terms">
+            <li>
+                <strong>Term of tenancy</strong>
+                The tenancy is for a fixed term of @termMonths months, commencing on @Model.StartDate.ToString("d MMMM yyyy")
+                and expiring on @Model.EndDate.ToString("d MMMM yyyy").
+            </li>
+
+            <li>
+                <strong>Rent</strong>
+                Rent is RM @Model.MonthlyRent.ToString("N0") per calendar month, payable in advance on or before the
+                first day of each month through the RentEasy platform. Rent remaining unpaid for more than
+                @ArrearsPolicy.GraceDays days after the due date is treated as being in arrears and is dealt with
+                under clause 3.
+            </li>
+
+            <li>
+                <strong>Late payment of rent</strong>
+                Where an instalment of rent is not received within @ArrearsPolicy.GraceDays days of falling due,
+                the following steps are taken in turn, and a dated record of each is kept on this agreement:
+                <div class="clause-highlight">
+                    <ul>
+                        <li>
+                            <strong style="color:var(--text-primary);">First missed month &mdash; reminder.</strong>
+                            The Tenant is sent a written reminder identifying the instalment, the amount and the
+                            date it fell due.
+                        </li>
+                        <li>
+                            <strong style="color:var(--text-primary);">Second missed month &mdash; deduction from the security deposit.</strong>
+                            Where rent for two months remains unpaid, the Landlord may apply the security deposit
+                            towards the arrears, oldest instalment first, to the extent the deposit covers a whole
+                            instalment. The Tenant shall restore the deposit to its original amount before the end
+                            of the term; the deposit so applied does not relieve the Tenant of the rent falling due
+                            in later months.
+                        </li>
+                        <li>
+                            <strong style="color:var(--text-primary);">Third missed month &mdash; compound.</strong>
+                            Where rent remains outstanding into a third month, a compound of
+                            @((ArrearsPolicy.CompoundRate * 100).ToString("0"))% of the rent then outstanding,
+                            subject to a minimum of RM @ArrearsPolicy.MinimumCompound.ToString("N0"), is charged to
+                            the Tenant and is payable within @ArrearsPolicy.CompoundDueDays days of being issued.
+                        </li>
+                    </ul>
+                    <p style="margin-top:10px;">
+                        Nothing in this clause limits the Landlord's right to terminate the tenancy for continued
+                        non-payment, or to recover any rent, compound or shortfall that remains due after the
+                        security deposit has been exhausted.
+                    </p>
+                </div>
+            </li>
+
+            <li>
+                <strong>Security deposit</strong>
+                The Tenant shall pay a security deposit of RM @Model.DepositAmount.ToString("N0")@depositInMonths.
+                The deposit is held by the Landlord as security for the Tenant's obligations under this agreement,
+                does not bear interest, and may not be treated by the Tenant as payment of rent for any month,
+                including the final month of the term. It shall be refunded within fourteen (14) days after the Tenant
+                delivers vacant possession, less any deductions properly made under clause 5 or clause 3.
+            </li>
+
+            <li>
+                <strong>Deductions from the security deposit</strong>
+                <div class="clause-highlight">
+                    The Landlord may deduct from the security deposit the reasonable cost of:
+                    <ul>
+                        <li>repairing or replacing any part of the Property, or any fixture, fitting, furnishing or
+                            appliance in it, that is <strong style="color:var(--text-primary);">broken, damaged, defaced or missing</strong>,
+                            save for fair wear and tear as defined in clause 6;</li>
+                        <li>making good any damage caused by the Tenant or by the Tenant's family, guests, invitees or
+                            pets, whether caused wilfully or by negligence;</li>
+                        <li>any rent, utility charges or service charges left outstanding at the end of the tenancy;</li>
+                        <li>cleaning the Property, including carpets and upholstery, where it is not returned in a
+                            reasonably clean condition;</li>
+                        <li>replacing keys, access cards or remote controls that are lost or not returned; and</li>
+                        <li>removing and disposing of any belongings the Tenant leaves behind after handover.</li>
+                    </ul>
+                    <p style="margin-top:10px;">
+                        The Landlord shall give the Tenant a written itemised statement of any deduction, supported by
+                        receipts or quotations where reasonably available. Where the total cost of making good exceeds
+                        the security deposit, the Tenant shall pay the shortfall to the Landlord within fourteen (14)
+                        days of receiving that statement.
+                    </p>
+                </div>
+            </li>
+
+            <li>
+                <strong>Fair wear and tear</strong>
+                The Tenant is not liable for deterioration resulting from ordinary and reasonable use of the Property
+                over the term &mdash; such as minor scuff marks, faded paint or curtains, and normal wear to flooring.
+                Deductions under clause 5 apply only to damage going beyond fair wear and tear.
+            </li>
+
+            <li>
+                <strong>Inventory and inspection</strong>
+                The parties shall jointly inspect the Property and agree a written inventory recording its condition
+                and contents on the commencement date, and again on handover. That inventory is the reference point for
+                assessing any deduction under clause 5. During the term the Landlord may inspect the Property after
+                giving the Tenant at least twenty-four (24) hours' written notice.
+            </li>
+
+            <li>
+                <strong>Tenant's obligations</strong>
+                The Tenant shall:
+                <ul>
+                    <li>keep the Property clean and in the same condition as at the commencement of the tenancy,
+                        fair wear and tear excepted;</li>
+                    <li>report any damage, leak, fault or defect to the Landlord within three (3) days of becoming
+                        aware of it, and is responsible for any worsening of the damage caused by a failure to do so;</li>
+                    <li>bear the cost of minor repairs and replaceable items up to RM 200 per item per occurrence,
+                        including light bulbs, fuses and tap washers;</li>
+                    <li>not carry out alterations, drilling, or repainting without the Landlord's prior written consent; and</li>
+                    <li>not sublet, assign or part with possession of the Property, nor use it for any unlawful purpose.</li>
+                </ul>
+            </li>
+
+            <li>
+                <strong>Landlord's obligations</strong>
+                The Landlord shall keep the structure, roof, plumbing and electrical wiring of the Property in proper
+                repair, pay all quit rent, assessment and building insurance, carry out repairs falling to the Landlord
+                within a reasonable time of being notified, and permit the Tenant quiet enjoyment of the Property
+                throughout the term.
+            </li>
+
+            <li>
+                <strong>Early termination</strong>
+                Either party may terminate this agreement by giving two (2) months' written notice. Should the Tenant
+                vacate before the expiry of the fixed term without giving such notice, the security deposit shall be
+                forfeited to the Landlord, without prejudice to the Landlord's rights under clause 5 in respect of any
+                damage to the Property.
+            </li>
+
+            <li>
+                <strong>Handover</strong>
+                On the expiry or earlier termination of this agreement the Tenant shall deliver vacant possession of the
+                Property, return all keys, access cards and remote controls, and leave the Property in the condition
+                required by clause 8.
+            </li>
+        </ol>
+
+        <div class="signature-block">
+            <div class="sig">
+                <div class="role">Landlord</div>
+                <div class="name">@owner.FullName</div>
+            </div>
+            <div class="sig">
+                <div class="role">Tenant</div>
+                <div class="name">@tenant.FullName</div>
+            </div>
+        </div>
+
+        <p style="font-size:11px; color:var(--text-muted); margin-top:18px; line-height:1.6;">
+            @if (Model.Application.TermsAcceptedDate.HasValue)
+            {
+                @:Accepted electronically by the Tenant through RentEasy on @Model.Application.TermsAcceptedDate.Value.ToString("d MMMM yyyy").
+            }
+            else
+            {
+                @:Not yet accepted by the Tenant.
+            }
+            Agreement reference #@Model.AgreementID.
+            <br />
+            This document is a standard template provided for convenience and is not legal advice; parties should seek
+            independent advice before relying on it.
+        </p>
+    </div>
+</div>

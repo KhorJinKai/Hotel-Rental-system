@@ -1,0 +1,61 @@
+@model HouseRentalSystem.Models.AgreementRequestViewModel
+@using HouseRentalSystem.Models
+@{
+    var isRefund = Model.RequestType == RequestType.Refund;
+    ViewData["Title"] = isRefund ? "Request a refund" : "Request cancellation";
+}
+
+<div class="container page-section" style="max-width:640px;">
+
+    <div class="results-head">
+        <div>
+            <h1>@(isRefund ? "Request a refund" : "Request cancellation")</h1>
+            <span class="result-count">@Model.PropertyTitle</span>
+        </div>
+        <a class="btn-outline" asp-controller="AgreementRequest" asp-action="MyRequests">My requests</a>
+    </div>
+
+    <div class="checkout-card">
+        <p class="section-subtitle">
+            @if (isRefund)
+            {
+                <text>An admin reviews every refund request before any money moves. Explain what you're being refunded for.</text>
+            }
+            else
+            {
+                <text>An admin reviews every cancellation before the tenancy is ended. Explain why you'd like to cancel.</text>
+            }
+        </p>
+
+        <form asp-controller="AgreementRequest" asp-action="Create" method="post">
+            <div asp-validation-summary="All" class="text-danger"></div>
+            <input type="hidden" asp-for="AgreementID" />
+            <input type="hidden" asp-for="RequestType" />
+            <input type="hidden" asp-for="PropertyTitle" />
+            <input type="hidden" asp-for="DepositBalance" />
+
+            @if (isRefund)
+            {
+                <div class="form-row">
+                    <label asp-for="RequestedAmount">Amount requested (RM)</label>
+                    <input asp-for="RequestedAmount" type="number" step="0.01" min="0.01" />
+                    <span asp-validation-for="RequestedAmount" class="text-danger"></span>
+                    <div class="field-hint">Current deposit balance on this tenancy: RM @Model.DepositBalance.ToString("N2")</div>
+                </div>
+            }
+
+            <div class="form-row">
+                <label asp-for="Reason">Reason</label>
+                <textarea asp-for="Reason" rows="5" placeholder="@(isRefund ? "e.g. Moved out on 1 Jan, deposit hasn't been returned" : "e.g. Relocating for work, need to end the tenancy early")"></textarea>
+                <span asp-validation-for="Reason" class="text-danger"></span>
+                <div class="field-hint">Between 10 and 500 characters.</div>
+            </div>
+
+            <button type="submit" class="btn-primary">Submit request</button>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

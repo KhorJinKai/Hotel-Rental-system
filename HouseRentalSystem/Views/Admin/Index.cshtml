@@ -1,0 +1,92 @@
+@model HouseRentalSystem.Models.AdminDashboardViewModel
+@{
+    ViewData["Title"] = "Admin dashboard";
+}
+
+<div class="container page-section">
+
+    <div class="results-head">
+        <div>
+            <h1>Admin dashboard</h1>
+            <span class="result-count">System-wide overview of RentEasy</span>
+        </div>
+    </div>
+
+    <div class="fact-grid" style="margin-bottom:24px;">
+        <div class="fact">
+            <div class="fact-label">Total users</div>
+            <div class="fact-value">@Model.TotalUsers</div>
+        </div>
+        <div class="fact">
+            <div class="fact-label">Owners</div>
+            <div class="fact-value">@Model.TotalOwners</div>
+        </div>
+        <div class="fact">
+            <div class="fact-label">Tenants</div>
+            <div class="fact-value">@Model.TotalTenants</div>
+        </div>
+        <div class="fact">
+            <div class="fact-label">Blocked accounts</div>
+            <div class="fact-value" style="@(Model.BlockedUsers > 0 ? "color:var(--accent-urgent);" : "")">@Model.BlockedUsers</div>
+        </div>
+        <div class="fact">
+            <div class="fact-label">Total listings</div>
+            <div class="fact-value">@Model.TotalProperties</div>
+        </div>
+        <div class="fact">
+            <div class="fact-label">Available listings</div>
+            <div class="fact-value">@Model.AvailableProperties</div>
+        </div>
+        <div class="fact">
+            <div class="fact-label">Active tenancies</div>
+            <div class="fact-value">@Model.ActiveAgreements</div>
+        </div>
+        <div class="fact">
+            <div class="fact-label">Pending applications</div>
+            <div class="fact-value">@Model.PendingApplications</div>
+        </div>
+        <div class="fact">
+            <div class="fact-label">Bookings awaiting approval</div>
+            <div class="fact-value" style="@(Model.PendingBookingApprovals > 0 ? "color:var(--accent-urgent);" : "")">@Model.PendingBookingApprovals</div>
+        </div>
+        <div class="fact">
+            <div class="fact-label">Pending requests</div>
+            <div class="fact-value" style="@(Model.PendingRequests > 0 ? "color:var(--accent-urgent);" : "")">@Model.PendingRequests</div>
+        </div>
+        <div class="fact">
+            <div class="fact-label">Support awaiting reply</div>
+            <div class="fact-value" style="@(Model.AwaitingSupportReply > 0 ? "color:var(--accent-urgent);" : "")">@Model.AwaitingSupportReply</div>
+        </div>
+        <div class="fact">
+            <div class="fact-label">Maintenance requests awaiting reply</div>
+            <div class="fact-value" style="@(Model.PendingMaintenanceRequests > 0 ? "color:var(--accent-urgent);" : "")">@Model.PendingMaintenanceRequests</div>
+        </div>
+    </div>
+
+    <div class="form-grid-2">
+        <a class="checkout-card" style="display:block; text-decoration:none;" asp-controller="Admin" asp-action="BookingApprovals">
+            <h2 class="section-title" style="margin-bottom:4px;">Booking approvals &rarr;</h2>
+            <p style="color:var(--text-secondary); font-size:13.5px; margin:0;">Give final sign-off on bookings the owner has already approved before the agreement goes live.</p>
+        </a>
+        <a class="checkout-card" style="display:block; text-decoration:none;" asp-controller="Admin" asp-action="Users">
+            <h2 class="section-title" style="margin-bottom:4px;">Manage users &rarr;</h2>
+            <p style="color:var(--text-secondary); font-size:13.5px; margin:0;">Search accounts, review roles, block or unblock logins.</p>
+        </a>
+        <a class="checkout-card" style="display:block; text-decoration:none;" asp-controller="Admin" asp-action="Properties">
+            <h2 class="section-title" style="margin-bottom:4px;">Manage listings &rarr;</h2>
+            <p style="color:var(--text-secondary); font-size:13.5px; margin:0;">Browse every listing on the platform and hide any that need moderating.</p>
+        </a>
+        <a class="checkout-card" style="display:block; text-decoration:none;" asp-controller="Admin" asp-action="Requests">
+            <h2 class="section-title" style="margin-bottom:4px;">Cancellation &amp; refund requests &rarr;</h2>
+            <p style="color:var(--text-secondary); font-size:13.5px; margin:0;">Review and decide on tenancy cancellations and refunds raised by tenants and owners.</p>
+        </a>
+        <a class="checkout-card" style="display:block; text-decoration:none;" asp-controller="Admin" asp-action="Support">
+            <h2 class="section-title" style="margin-bottom:4px;">Support inbox &rarr;</h2>
+            <p style="color:var(--text-secondary); font-size:13.5px; margin:0;">Reply to tenant and owner messages. Available 9am&ndash;7pm daily; a bot acknowledges anything outside those hours.</p>
+        </a>
+        <a class="checkout-card" style="display:block; text-decoration:none;" asp-controller="Admin" asp-action="Maintenance">
+            <h2 class="section-title" style="margin-bottom:4px;">Maintenance requests &rarr;</h2>
+            <p style="color:var(--text-secondary); font-size:13.5px; margin:0;">Verify issues tenants report and reply to them - the owner gets a report of the outcome once you do.</p>
+        </a>
+    </div>
+</div>

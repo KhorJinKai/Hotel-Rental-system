@@ -1,0 +1,45 @@
+@model HouseRentalSystem.Models.SupportTicketViewModel
+@using HouseRentalSystem.Services
+@{
+    ViewData["Title"] = "Contact support";
+}
+
+<div class="container page-section" style="max-width:640px;">
+
+    <div class="results-head">
+        <div>
+            <h1>Contact support</h1>
+            <span class="result-count">
+                @(SupportHours.IsOpenNow()
+                    ? "Our team is online now (9am–7pm daily)."
+                    : "Our team is offline right now — back 9am–7pm daily. We'll still log your message.")
+            </span>
+        </div>
+        <a class="btn-outline" asp-controller="Support" asp-action="Index">My tickets</a>
+    </div>
+
+    <div class="checkout-card">
+        <form asp-controller="Support" asp-action="Create" method="post">
+            <div asp-validation-summary="All" class="text-danger"></div>
+
+            <div class="form-row">
+                <label asp-for="Subject">Subject</label>
+                <input asp-for="Subject" placeholder="e.g. Question about my deposit" />
+                <span asp-validation-for="Subject" class="text-danger"></span>
+            </div>
+
+            <div class="form-row">
+                <label asp-for="Message">Message</label>
+                <textarea asp-for="Message" rows="6" placeholder="Tell us what's going on and we'll get back to you."></textarea>
+                <span asp-validation-for="Message" class="text-danger"></span>
+                <div class="field-hint">Between 10 and 2000 characters.</div>
+            </div>
+
+            <button type="submit" class="btn-primary">Send message</button>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

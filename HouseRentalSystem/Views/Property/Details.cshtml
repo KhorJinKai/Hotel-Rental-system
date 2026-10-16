@@ -1,0 +1,254 @@
+@model HouseRentalSystem.Models.PropertyDetailsViewModel
+@{
+    ViewData["Title"] = Model.Title;
+    var photos = Model.PhotoPaths;
+    var hasPhotos = photos.Any();
+    var starLabels = new[] { "5 stars", "4 stars", "3 stars", "2 stars", "1 star" };
+    var mapsUrl = "https://www.google.com/maps/search/?api=1&query=" + Uri.EscapeDataString($"{Model.Address}, {Model.City}");
+}
+
+<div class="container page-section">
+
+    <div class="prop-head">
+        <div>
+            <h1>@Model.Title</h1>
+            <div class="prop-sub">
+                @if (!string.IsNullOrEmpty(Model.CategoryName))
+                {
+                    <span class="type-tag">@Model.CategoryName</span>
+                }
+                <a href="@mapsUrl" target="_blank" rel="noopener noreferrer">&#128205; @Model.Address, @Model.City</a>
+                <span>&middot;</span>
+                <span>@Model.NumBedrooms bedroom@(Model.NumBedrooms == 1 ? "" : "s") &middot; @Model.NumBathrooms bathroom@(Model.NumBathrooms == 1 ? "" : "s")</span>
+            </div>
+        </div>
+
+        <div class="score-line">
+            @if (Model.ReviewCount > 0)
+            {
+                <span class="score-badge">@Model.ReviewScore.ToString("0.0")</span>
+                <span class="score-text">
+                    <span class="score-word">@Model.ScoreWord</span>
+                    <span class="score-count">@Model.ReviewCount tenant review@(Model.ReviewCount == 1 ? "" : "s")</span>
+                </span>
+            }
+            else
+            {
+                <span class="score-badge is-empty">New</span>
+                <span class="score-text">
+                    <span class="score-word">No reviews yet</span>
+                    <span class="score-count">Listed @Model.ListedDate.ToString("MMM yyyy")</span>
+                </span>
+            }
+        </div>
+    </div>
+
+    @if (hasPhotos)
+    {
+        <div class="gallery" id="propertyGallery">
+            <img class="main" src="@photos[0]" alt="@Model.Title - main photo" data-index="0" />
+            @for (int i = 1; i < Math.Min(photos.Count, 5); i++)
+            {
+                <img src="@photos[i]" alt="@Model.Title - photo @(i + 1)" data-index="@i" />
+            }
+            <button type="button" class="gallery-more" id="galleryMore">
+                &#128247; View all @photos.Count photo@(photos.Count == 1 ? "" : "s")
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="gallery" style="display:flex; align-items:center; justify-content:center; height:220px; color:var(--brand-primary); font-size:15px; font-weight:600;">
+            &#127968;&nbsp; No photos uploaded for this property yet
+        </div>
+    }
+
+    <div class="prop-layout">
+        <div>
+            <div class="detail-block">
+                <h2>About this place</h2>
+                <p>@Model.Description</p>
+
+                <div class="fact-grid" style="margin-top:16px;">
+                    <div class="fact">
+                        <div class="fact-label">Monthly rent</div>
+                        <div class="fact-value">RM @Model.RentPrice.ToString("N0")</div>
+                    </div>
+                    <div class="fact">
+                        <div class="fact-label">Deposit</div>
+                        <div class="fact-value">RM @Model.Deposit.ToString("N0")</div>
+                    </div>
+                    <div class="fact">
+                        <div class="fact-label">Bedrooms</div>
+                        <div class="fact-value">@Model.NumBedrooms</div>
+                    </div>
+                    <div class="fact">
+                        <div class="fact-label">Bathrooms</div>
+                        <div class="fact-value">@Model.NumBathrooms</div>
+                    </div>
+                    <div class="fact">
+                        <div class="fact-label">Listed</div>
+                        <div class="fact-value">@Model.ListedDate.ToString("MMM yyyy")</div>
+                    </div>
+                </div>
+            </div>
+
+            @if (Model.AmenityNames.Any())
+            {
+                <div class="detail-block">
+                    <h2>Facilities &amp; amenities</h2>
+                    <ul class="amenities-list">
+                        @foreach (var amenity in Model.AmenityNames)
+                        {
+                            <li><span class="tick">&#10003;</span> @amenity</li>
+                        }
+                    </ul>
+                </div>
+            }
+
+            <div class="detail-block">
+                <h2>Tenant review score</h2>
+                @if (Model.ReviewCount > 0)
+                {
+                    <div class="score-panel">
+                        <div class="score-hero">
+                            <div class="big">@Model.ReviewScore.ToString("0.0")</div>
+                            <div class="word">@Model.ScoreWord</div>
+                            <div class="sub">from @Model.ReviewCount tenant review@(Model.ReviewCount == 1 ? "" : "s")</div>
+                        </div>
+                        <div class="score-bars">
+                            @for (int stars = 5; stars >= 1; stars--)
+                            {
+                                var percent = Model.PercentFor(stars);
+                                <div class="score-bar-row">
+                                    <div class="label">
+                                        <span>@starLabels[5 - stars]</span>
+                                        <span>@Model.RatingDistribution[stars - 1]</span>
+                                    </div>
+                                    <div class="score-bar-track">
+                                        <div class="score-bar-fill" style="width:@percent%;"></div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <p>This property has no tenant reviews yet. Reviews can only be left by tenants who completed a rental agreement here, so every score you see on RentEasy comes from a real stay.</p>
+                }
+            </div>
+
+            <div class="detail-block">
+                <h2>Hosted by @Model.OwnerName</h2>
+                <div class="rc-meta" style="margin-bottom:10px;">
+                    <span class="amenity-chip">Member since @Model.OwnerJoinedDate.ToString("MMM yyyy")</span>
+                    <span class="amenity-chip">@Model.OwnerListingCount propert@(Model.OwnerListingCount == 1 ? "y" : "ies") listed</span>
+                    <span class="amenity-chip">Identity verified</span>
+                </div>
+                <p style="margin:0;">Contact details are shared through the platform once your rental application is approved, so you never have to publish your phone number to make an enquiry.</p>
+            </div>
+
+            <div class="detail-block">
+                <h2>Reviews (@Model.ReviewCount)</h2>
+                @foreach (var review in Model.Reviews)
+                {
+                    var reviewerName = string.IsNullOrWhiteSpace(review.ReviewerName) ? "Tenant" : review.ReviewerName;
+                    <div class="review-item">
+                        <div class="review-avatar">@reviewerName[0]</div>
+                        <div>
+                            <div class="review-name">@reviewerName</div>
+                            <div class="rating">
+                                @for (int s = 0; s < review.Rating; s++)
+                                {
+                                    <span class="star">&#9733;</span>
+                                }
+                                <span class="review-date">&nbsp;@review.ReviewDate.ToString("MMM yyyy")</span>
+                            </div>
+                            <p>@review.Comment</p>
+                        </div>
+                    </div>
+                }
+                @if (!Model.Reviews.Any())
+                {
+                    <p style="color:var(--text-muted); margin:0;">No reviews yet.</p>
+                }
+            </div>
+        </div>
+
+        <aside class="booking-panel">
+            @if (!Model.IsAvailable && !Model.HasExistingRequest)
+            {
+                <span class="panel-flag" style="background:var(--surface-alt); color:var(--text-secondary);">Not available</span>
+            }
+            else if (Model.ReviewScore >= 8 && Model.ReviewCount > 0)
+            {
+                <span class="panel-flag">&#128077; Highly rated by tenants</span>
+            }
+            else
+            {
+                <span class="panel-flag">&#9989; Free to apply</span>
+            }
+
+            <div class="price-row">Monthly rent</div>
+            <div class="price-big">RM @Model.RentPrice.ToString("N0") <small>/ month</small></div>
+
+            @if (Model.HasExistingRequest)
+            {
+                <div class="price-breakdown">
+                    <div class="row"><span>Monthly rent</span><span>RM @Model.RentPrice.ToString("N0")</span></div>
+                    <div class="row total"><span>Deposit due now</span><span>RM @Model.Deposit.ToString("N0")</span></div>
+                </div>
+                <button type="button" class="btn-primary" disabled>Request already sent</button>
+                <p class="panel-note">
+                    You already have a booking request for this property. Track it in
+                    <a asp-controller="RentalApplication" asp-action="MyBookings">My bookings</a>.
+                </p>
+            }
+            else if (!Model.IsAvailable)
+            {
+                <button type="button" class="btn-primary" disabled>Not available</button>
+                <p class="panel-note">
+                    This property has already been rented out and isn't accepting new booking requests right now.
+                </p>
+            }
+            else
+            {
+                <form asp-controller="RentalApplication" asp-action="Create" method="get">
+                    <input type="hidden" name="propertyId" value="@Model.PropertyID" />
+
+                    <label for="MoveInDate">Move-in date</label>
+                    <input type="date" id="MoveInDate" name="moveInDate" required />
+
+                    <div class="price-breakdown">
+                        <div class="row"><span>Monthly rent</span><span>RM @Model.RentPrice.ToString("N0")</span></div>
+                        <div class="row total"><span>Deposit due now</span><span>RM @Model.Deposit.ToString("N0")</span></div>
+                    </div>
+
+                    <button type="submit" class="btn-primary">Request to book</button>
+                </form>
+                <p class="panel-note">Next you'll accept the tenancy agreement and pay the deposit - the owner only sees your request after that.</p>
+            }
+
+            <ul class="panel-perks">
+                <li><span class="tick">&#10003;</span> No booking or service fee</li>
+                <li><span class="tick">&#10003;</span> Secure card payment via Stripe</li>
+                <li><span class="tick">&#10003;</span> Full refund if the owner or admin declines</li>
+                <li><span class="tick">&#10003;</span> Deposit refundable per the agreement</li>
+            </ul>
+        </aside>
+    </div>
+</div>
+
+@if (hasPhotos)
+{
+    <div class="lightbox" id="lightbox">
+        <button type="button" class="lightbox-close" id="lightboxClose" aria-label="Close">&times;</button>
+        <button type="button" class="lightbox-nav prev" id="lightboxPrev" aria-label="Previous photo">&#8249;</button>
+        <img id="lightboxImage" src="" alt="Property photo" />
+        <button type="button" class="lightbox-nav next" id="lightboxNext" aria-label="Next photo">&#8250;</button>
+        <div class="lightbox-counter" id="lightboxCounter"></div>
+    </div>
+
+    <script id="galleryData" type="application/json">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(photos))</script>
+}

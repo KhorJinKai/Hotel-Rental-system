@@ -1,0 +1,87 @@
+@model HouseRentalSystem.Models.RegisterViewModel
+@{
+    ViewData["Title"] = "Create account";
+}
+
+<div class="container page-section" style="max-width:480px;">
+    <div class="checkout-card">
+        <h1 style="font-size:21px; margin:0 0 4px; text-align:center;">Create your account</h1>
+        <p style="font-size:13px; color:var(--text-secondary); text-align:center; margin:0 0 22px;">
+            Join as a house owner or a tenant — it takes under a minute.
+        </p>
+
+        <form asp-controller="Security" asp-action="Register" method="post">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+            <div class="form-row">
+                <label asp-for="FullName">Full name</label>
+                <input asp-for="FullName" placeholder="Your full name" />
+                <span asp-validation-for="FullName" class="text-danger"></span>
+            </div>
+
+            <div class="form-row">
+                <label asp-for="Email">Email</label>
+                <input asp-for="Email" placeholder="name@example.com" autocomplete="username" />
+                <span asp-validation-for="Email" class="text-danger"></span>
+            </div>
+
+            <div class="form-grid-2">
+                <div class="form-row">
+                    <label asp-for="Phone">Phone number</label>
+                    <input asp-for="Phone" placeholder="e.g. 012-3456789" />
+                    <span asp-validation-for="Phone" class="text-danger"></span>
+                </div>
+
+                <div class="form-row">
+                    <label asp-for="DateOfBirth">Date of birth</label>
+                    <input asp-for="DateOfBirth" max="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                    <span asp-validation-for="DateOfBirth" class="text-danger"></span>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <label asp-for="Role">I am a...</label>
+                <select asp-for="Role">
+                    <option value="@HouseRentalSystem.Models.UserRole.Tenant">Tenant — looking to rent</option>
+                    <option value="@HouseRentalSystem.Models.UserRole.Owner">House owner — listing properties</option>
+                </select>
+                <span asp-validation-for="Role" class="text-danger"></span>
+            </div>
+
+            <div class="form-row">
+                <label asp-for="Password">Password</label>
+                <input asp-for="Password" placeholder="At least 8 characters, with upper, lower, number & symbol" autocomplete="new-password" />
+                <span asp-validation-for="Password" class="text-danger"></span>
+            </div>
+
+            <div class="form-row">
+                <label asp-for="ConfirmPassword">Confirm password</label>
+                <input asp-for="ConfirmPassword" placeholder="Re-enter your password" autocomplete="new-password" />
+                <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
+            </div>
+
+            <div class="form-row">
+                <label asp-for="Captcha">Verification</label>
+                <div class="captcha-row">
+                    <img id="captchaImage" class="captcha-image" src="@Url.Action("Image", "Captcha")"
+                         width="170" height="56" alt="Characters to type into the box below" />
+                    <button type="button" id="captchaReload" class="captcha-reload"
+                            title="Get a new image" aria-label="Get a new image">&#8635;</button>
+                </div>
+                <input asp-for="Captcha" placeholder="Type the characters above"
+                       autocomplete="off" autocapitalize="characters" spellcheck="false" />
+                <span asp-validation-for="Captcha" class="text-danger"></span>
+            </div>
+
+            <button type="submit" class="btn-primary">Create account</button>
+        </form>
+
+        <p style="text-align:center; font-size:13px; margin-top:16px; color:var(--text-secondary);">
+            Already have an account? <a asp-controller="Security" asp-action="Login">Sign in</a>
+        </p>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

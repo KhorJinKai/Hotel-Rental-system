@@ -1,0 +1,85 @@
+@model HouseRentalSystem.Models.SupportTicket
+@using HouseRentalSystem.Models
+@using HouseRentalSystem.Services
+@{
+    ViewData["Title"] = "Ticket #" + Model.TicketID;
+    var isAdminView = ViewBag.IsAdminView is bool a && a;
+    var messages = Model.Messages.OrderBy(m => m.SentDate).ThenBy(m => m.MessageID).ToList();
+
+    string AlignClass(SupportMessage m)
+    {
+        if (m.Sender == MessageSender.Bot) return "from-bot";
+        var isMine = (isAdminView && m.Sender == MessageSender.Admin) || (!isAdminView && m.Sender == MessageSender.User);
+        return isMine ? "mine" : "theirs";
+    }
+
+    string SenderLabel(SupportMessage m)
+    {
+        if (m.Sender == MessageSender.Bot) return "Automated reply";
+        if (m.Sender == MessageSender.Admin) return isAdminView ? "You (Support)" : "Support team";
+        return isAdminView ? Model.User?.FullName ?? "Customer" : "You";
+    }
+
+    string StatusClass(TicketStatus s) => s == TicketStatus.Closed ? "status-neutral" : "status-pending";
+}
+
+<div class="container page-section" style="max-width:760px;">
+
+    <div class="results-head">
+        <div>
+            <h1>@Model.Subject</h1>
+            <span class="result-count">
+                Ticket #@Model.TicketID
+                @if (isAdminView)
+                {
+                    @:&middot; @Model.User?.FullName (@Model.User?.Email)
+                }
+            </span>
+        </div>
+        <span class="status-pill @StatusClass(Model.Status)">@Model.Status</span>
+    </div>
+
+    @if (!SupportHours.IsOpenNow())
+    {
+        <div class="toast" style="margin-top:0; margin-bottom:16px;">
+            <span class="toast-icon">&#8505;</span>
+            Support is offline right now (open 9am&ndash;7pm daily) &mdash; messages sent outside these hours get an automatic acknowledgement.
+        </div>
+    }
+
+    <div class="checkout-card">
+        <div class="support-thread">
+            @foreach (var message in messages)
+            {
+                <div class="support-msg @AlignClass(message)">
+                    <div class="msg-meta">
+                        <strong>@SenderLabel(message)</strong>
+                        <span>&middot; @message.SentDate.ToString("d MMM yyyy, h:mm tt")</span>
+                    </div>
+                    <div class="msg-body">@message.Body</div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="checkout-card" style="margin-top:16px;">
+        @if (Model.Status == TicketStatus.Closed && !isAdminView)
+        {
+            <p class="field-hint" style="margin-bottom:10px;">This ticket is closed &mdash; sending a message will reopen it.</p>
+        }
+        <form asp-controller="Support" asp-action="Reply" asp-route-id="@Model.TicketID" method="post">
+            <div class="form-row" style="margin-bottom:10px;">
+                <textarea name="body" rows="4" placeholder="Type your message..."></textarea>
+            </div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <button type="submit" class="btn-primary" style="margin-top:0;">Send</button>
+                @if (isAdminView && Model.Status == TicketStatus.Open)
+                {
+                    <button type="submit" formaction="@Url.Action("Close", "Support", new { id = Model.TicketID })"
+                            class="btn-outline btn-inline" style="margin-top:0; color:var(--accent-urgent); border-color:var(--accent-urgent);"
+                            onclick="return confirm('Close this ticket?');">Close ticket</button>
+                }
+            </div>
+        </form>
+    </div>
+</div>

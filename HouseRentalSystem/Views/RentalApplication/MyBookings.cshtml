@@ -1,0 +1,147 @@
+@model List<HouseRentalSystem.Models.RentalApplication>
+@using HouseRentalSystem.Models
+@{
+    ViewData["Title"] = "My bookings";
+
+    string StatusClass(ApplicationStatus status) => status switch
+    {
+        ApplicationStatus.Approved => "status-approved",
+        ApplicationStatus.Rejected => "status-rejected",
+        _ => "status-pending"
+    };
+
+    string StatusLabel(ApplicationStatus status) => status switch
+    {
+        ApplicationStatus.PendingAdminApproval => "Awaiting approval",
+        ApplicationStatus.AwaitingPayment => "Awaiting your payment",
+        _ => status.ToString()
+    };
+
+    string RibbonColour(ApplicationStatus status) => status switch
+    {
+        ApplicationStatus.Approved => "var(--accent-value)",
+        ApplicationStatus.Rejected => "var(--accent-urgent)",
+        ApplicationStatus.AwaitingPayment => "var(--accent-urgent)",
+        _ => "var(--cta)"
+    };
+}
+
+<div class="container page-section">
+
+    <div class="results-head">
+        <div>
+            <h1>My bookings</h1>
+            <span class="result-count">@Model.Count application@(Model.Count == 1 ? "" : "s") &middot; @Model.Count(a => a.Status == ApplicationStatus.Approved) approved</span>
+        </div>
+        <a class="btn-outline" asp-controller="Home" asp-action="Index">Find another place</a>
+    </div>
+
+    @if (!Model.Any())
+    {
+        <div class="empty-state">
+            <div class="icon">&#128188;</div>
+            <h3>You haven't applied to rent anything yet</h3>
+            <p>Browse verified listings across Malaysia and send a free booking request.</p>
+            <a class="btn-outline" asp-controller="Home" asp-action="Index">Start searching</a>
+        </div>
+    }
+
+    <div class="property-grid">
+        @foreach (var application in Model)
+        {
+            var primaryPhoto = application.Property?.Photos?.FirstOrDefault(p => p.IsPrimary)?.PhotoPath
+                                ?? application.Property?.Photos?.FirstOrDefault()?.PhotoPath;
+
+            // Rent (or a compound) past its due date and still unpaid on a live tenancy - the
+            // same test the "My bookings" nav dot uses, shown here against the property it
+            // belongs to so the tenant knows which one to pay.
+            var overdueCount = application.Agreement?.Status == AgreementStatus.Active
+                ? (application.Agreement.Payments ?? new List<Payment>())
+                    .Count(p => (p.PaymentType == PaymentType.Rent || p.PaymentType == PaymentType.Compound)
+                                && p.PaymentStatus != PaymentStatus.Paid
+                                && p.DueDate.Date < DateTime.Today)
+                : 0;
+            <div class="property-card">
+                <a class="card-link" asp-controller="Property" asp-action="Details" asp-route-id="@application.PropertyID">
+                    <div class="thumb">
+                        @if (!string.IsNullOrEmpty(primaryPhoto))
+                        {
+                            <img src="@primaryPhoto" alt="@application.Property?.Title" />
+                        }
+                        else
+                        {
+                            <span>&#127968;</span>
+                        }
+                        <span class="ribbon" style="background:@RibbonColour(application.Status);">@StatusLabel(application.Status)</span>
+                        @if (overdueCount > 0)
+                        {
+                            <span class="card-alert-dot" title="Rent overdue on this tenancy" aria-hidden="true"></span>
+                        }
+                    </div>
+                    <div class="body">
+                        <p class="title">@application.Property?.Title</p>
+                        <p class="location">&#128205; @application.Property?.City</p>
+                        <div class="price">RM @(application.Property?.RentPrice.ToString("N0")) <small>/ month</small></div>
+                        <p style="font-size:12px; color:var(--text-muted); margin:8px 0 0;">
+                            Move-in @application.MoveInDate.ToString("d MMM yyyy") &middot; @application.RentalDurationMonths months
+                        </p>
+                        <p style="font-size:12px; color:var(--text-muted); margin:2px 0 0;">
+                            Applied @application.AppliedDate.ToString("d MMM yyyy")
+                        </p>
+                    </div>
+                </a>
+
+                <div class="card-foot">
+                    <span class="status-pill @StatusClass(application.Status)">@StatusLabel(application.Status)</span>
+
+                    @if (overdueCount > 0)
+                    {
+                        <span class="status-pill status-rejected" style="margin-left:6px;">
+                            &#9679; @overdueCount rent payment@(overdueCount == 1 ? "" : "s") overdue
+                        </span>
+                    }
+
+                    @if (application.Status == ApplicationStatus.Rejected && !string.IsNullOrEmpty(application.RejectionReason))
+                    {
+                        <p style="font-size:12px; color:var(--accent-urgent); margin:10px 0 0;">
+                            <strong>Reason:</strong> @application.RejectionReason
+                        </p>
+                    }
+
+                    @if (application.Status == ApplicationStatus.Approved)
+                    {
+                        <a class="btn-primary" style="margin-top:10px; padding:10px;"
+                           asp-controller="RentalAgreement" asp-action="Details" asp-route-applicationId="@application.ApplicationID">
+                            View agreement &amp; pay
+                        </a>
+                    }
+
+                    @if (application.Status == ApplicationStatus.AwaitingPayment)
+                    {
+                        <a class="btn-primary" style="margin-top:10px; padding:10px;"
+                           asp-controller="RentalAgreement" asp-action="Details" asp-route-applicationId="@application.ApplicationID">
+                            Review agreement &amp; pay deposit
+                        </a>
+                        <p style="font-size:12px; color:var(--text-muted); margin:8px 0 0;">
+                            Your request isn't sent to the owner until you accept the agreement and pay the deposit.
+                        </p>
+                    }
+
+                    @if (application.Status == ApplicationStatus.Pending)
+                    {
+                        <p style="font-size:12px; color:var(--text-muted); margin:10px 0 0;">
+                            Waiting for the owner to respond — usually within 3 business days.
+                        </p>
+                    }
+
+                    @if (application.Status == ApplicationStatus.PendingAdminApproval)
+                    {
+                        <p style="font-size:12px; color:var(--text-muted); margin:10px 0 0;">
+                            Approved by the owner — waiting on final approval from our team before the agreement is issued.
+                        </p>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>

@@ -1,0 +1,141 @@
+@model HouseRentalSystem.Models.Property
+@{
+    ViewData["Title"] = "Edit listing";
+    var categories = ViewBag.Categories as List<HouseRentalSystem.Models.PropertyCategory>;
+    var amenities = ViewBag.Amenities as List<HouseRentalSystem.Models.Amenity>;
+    var selectedAmenityIds = (ViewBag.SelectedAmenityIds as IEnumerable<int>)?.ToHashSet() ?? new HashSet<int>();
+}
+
+<div class="container page-section" style="max-width:780px;">
+
+    <div class="results-head">
+        <div>
+            <h1>Edit listing</h1>
+            <span class="result-count">@Model.Title</span>
+        </div>
+        <a class="btn-outline" asp-controller="Property" asp-action="MyListings">Back to my listings</a>
+    </div>
+
+    <div class="checkout-card">
+        <form asp-controller="Property" asp-action="Edit" asp-route-id="@Model.PropertyID" method="post" enctype="multipart/form-data">
+            <div asp-validation-summary="All" class="text-danger"></div>
+
+            <div class="form-row">
+                <label asp-for="Title">Title</label>
+                <input asp-for="Title" />
+                <span asp-validation-for="Title" class="text-danger"></span>
+            </div>
+
+            <div class="form-row">
+                <label asp-for="Description">Description</label>
+                <textarea asp-for="Description" rows="5"></textarea>
+                <span asp-validation-for="Description" class="text-danger"></span>
+                <div class="field-hint">Maximum 1000 characters.</div>
+            </div>
+
+            <div class="form-row">
+                <label asp-for="Address">Address</label>
+                <input asp-for="Address" />
+                <span asp-validation-for="Address" class="text-danger"></span>
+            </div>
+
+            <div class="form-row">
+                <label asp-for="City">City</label>
+                <input asp-for="City" />
+                <span asp-validation-for="City" class="text-danger"></span>
+            </div>
+
+            <div class="form-row">
+                <label asp-for="CategoryID">Property type</label>
+                <select asp-for="CategoryID">
+                    <option value="">Select a type</option>
+                    @if (categories != null)
+                    {
+                        @foreach (var cat in categories)
+                        {
+                            <option value="@cat.CategoryID" selected="@(cat.CategoryID == Model.CategoryID)">@cat.CategoryName</option>
+                        }
+                    }
+                </select>
+                <span asp-validation-for="CategoryID" class="text-danger"></span>
+            </div>
+
+            <div class="form-grid-2">
+                <div class="form-row">
+                    <label asp-for="NumBedrooms">Bedrooms</label>
+                    <input asp-for="NumBedrooms" type="number" min="0" max="20" />
+                    <span asp-validation-for="NumBedrooms" class="text-danger"></span>
+                </div>
+                <div class="form-row">
+                    <label asp-for="NumBathrooms">Bathrooms</label>
+                    <input asp-for="NumBathrooms" type="number" min="0" max="20" />
+                    <span asp-validation-for="NumBathrooms" class="text-danger"></span>
+                </div>
+            </div>
+
+            <div class="form-grid-2">
+                <div class="form-row">
+                    <label asp-for="RentPrice">Monthly rent (RM)</label>
+                    <input asp-for="RentPrice" type="number" min="0" max="100000" step="0.01" />
+                    <span asp-validation-for="RentPrice" class="text-danger"></span>
+                </div>
+                <div class="form-row">
+                    <label asp-for="Deposit">Security deposit (RM)</label>
+                    <input asp-for="Deposit" type="number" min="0" step="0.01" />
+                    <span asp-validation-for="Deposit" class="text-danger"></span>
+                </div>
+            </div>
+
+            @if (amenities != null && amenities.Any())
+            {
+                <div class="form-row">
+                    <label>Facilities &amp; amenities</label>
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:0 16px;">
+                        @foreach (var amenity in amenities)
+                        {
+                            <label class="check-row">
+                                <input type="checkbox" name="selectedAmenities" value="@amenity.AmenityID" checked="@selectedAmenityIds.Contains(amenity.AmenityID)" /> @amenity.AmenityName
+                            </label>
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (Model.Photos != null && Model.Photos.Any())
+            {
+                <div class="form-row">
+                    <label>Current photos</label>
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); gap:10px;">
+                        @foreach (var photo in Model.Photos)
+                        {
+                            <div style="position:relative;">
+                                <img src="@photo.PhotoPath" alt="Property photo" style="width:100%; height:90px; object-fit:cover; border-radius:8px;" />
+                                @if (photo.IsPrimary)
+                                {
+                                    <span class="ribbon" style="position:absolute; top:6px; left:6px; background:var(--accent-value); font-size:10px; padding:2px 6px;">Main</span>
+                                }
+                                <button type="submit" formaction="@Url.Action("DeletePhoto", "Property", new { photoId = photo.PhotoID, propertyId = Model.PropertyID })"
+                                        formmethod="post" class="btn-outline btn-inline"
+                                        style="position:absolute; bottom:6px; right:6px; padding:2px 8px; font-size:11px;">
+                                    Remove
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            <div class="form-row">
+                <label for="photos">Add more photos</label>
+                <input type="file" id="photos" name="photos" accept="image/*" multiple />
+                <div class="field-hint">You can select multiple images to add to this listing.</div>
+            </div>
+
+            <button type="submit" class="btn-primary">Save changes</button>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

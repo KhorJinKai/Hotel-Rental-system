@@ -1,0 +1,18 @@
+@{
+    ViewData["Title"] = "Access denied";
+}
+
+<div class="container page-section" style="max-width:520px;">
+    <div class="empty-state">
+        <div class="icon">&#128274;</div>
+        <h3>Access denied</h3>
+        <p>
+            You don't have permission to view this page. Tenant and owner areas are kept separate —
+            if you think this is a mistake, sign in with the correct account type.
+        </p>
+        <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+            <a asp-controller="Home" asp-action="Index" class="btn-outline">Back to search</a>
+            <a asp-controller="Security" asp-action="Login" class="btn-primary btn-inline" style="margin-top:0;">Sign in</a>
+        </div>
+    </div>
+</div>

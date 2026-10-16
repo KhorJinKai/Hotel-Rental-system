@@ -1,0 +1,114 @@
+@model List<HouseRentalSystem.Models.RentalApplication>
+@using HouseRentalSystem.Models
+@{
+    ViewData["Title"] = "Booking requests";
+
+    string StatusClass(ApplicationStatus status) => status switch
+    {
+        ApplicationStatus.Approved => "status-approved",
+        ApplicationStatus.Rejected => "status-rejected",
+        _ => "status-pending"
+    };
+
+    string StatusLabel(ApplicationStatus status) =>
+        status == ApplicationStatus.PendingAdminApproval ? "Awaiting admin approval" : status.ToString();
+
+    var pendingCount = Model.Count(a => a.Status == ApplicationStatus.Pending);
+}
+
+<div class="container page-section" style="max-width:880px;">
+
+    <div class="results-head">
+        <div>
+            <h1>Booking requests</h1>
+            <span class="result-count">
+                @Model.Count request@(Model.Count == 1 ? "" : "s") total
+                @if (pendingCount > 0)
+                {
+                    @:· @pendingCount awaiting your response
+                }
+            </span>
+        </div>
+        <a class="btn-outline" asp-controller="Property" asp-action="MyListings">Back to my listings</a>
+    </div>
+
+    @if (!Model.Any())
+    {
+        <div class="empty-state">
+            <div class="icon">&#128237;</div>
+            <h3>No booking requests yet</h3>
+            <p>When a tenant applies for one of your properties, their request will appear here.</p>
+            <a class="btn-outline" asp-controller="Property" asp-action="Create">List another property</a>
+        </div>
+    }
+
+    @foreach (var application in Model)
+    {
+        <div class="checkout-card" style="margin-bottom:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; padding-bottom:14px; border-bottom:1px solid var(--border-color);">
+                <div>
+                    <div style="font-size:16px; font-weight:700;">@application.Property?.Title</div>
+                    <div style="font-size:13px; color:var(--text-secondary);">&#128205; @application.Property?.City</div>
+                </div>
+                <span class="status-pill @StatusClass(application.Status)">@StatusLabel(application.Status)</span>
+            </div>
+
+            <div style="margin-top:14px;">
+                <table class="data-table">
+                    <tbody>
+                        <tr><td style="width:170px;">Applicant</td><td><strong>@application.Tenant?.FullName</strong></td></tr>
+                        <tr><td>Email</td><td>@application.Tenant?.Email</td></tr>
+                        <tr><td>Phone</td><td>@application.Tenant?.Phone</td></tr>
+                        <tr><td>Move-in date</td><td><strong>@application.MoveInDate.ToString("d MMM yyyy")</strong></td></tr>
+                        <tr><td>Duration</td><td>@application.RentalDurationMonths months</td></tr>
+                        <tr><td>Applied</td><td>@application.AppliedDate.ToString("d MMM yyyy, h:mm tt")</td></tr>
+                        @if (!string.IsNullOrEmpty(application.Message))
+                        {
+                            <tr><td>Message</td><td>@application.Message</td></tr>
+                        }
+                        @if (application.Status == ApplicationStatus.Rejected && !string.IsNullOrEmpty(application.RejectionReason))
+                        {
+                            <tr><td>Rejection reason</td><td style="color:var(--accent-urgent);">@application.RejectionReason</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (application.Status == ApplicationStatus.Approved || application.Status == ApplicationStatus.Pending
+                || application.Status == ApplicationStatus.PendingAdminApproval)
+            {
+                <div style="margin-top:14px;">
+                    <a class="btn-outline" asp-controller="RentalAgreement" asp-action="Details" asp-route-applicationId="@application.ApplicationID">View rental agreement &rarr;</a>
+                </div>
+            }
+
+            @if (application.Status == ApplicationStatus.PendingAdminApproval)
+            {
+                <p style="margin-top:14px; font-size:13px; color:var(--text-muted);">
+                    You've approved this booking - it's now with an admin for final sign-off before the agreement goes live.
+                </p>
+            }
+
+            @if (application.Status == ApplicationStatus.Pending)
+            {
+                <div style="margin-top:16px; display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap;">
+                    <form asp-controller="RentalApplication" asp-action="Approve" asp-route-id="@application.ApplicationID" method="post">
+                        <button type="submit" class="btn-primary btn-inline">Approve request</button>
+                    </form>
+
+                    <details style="flex:1; min-width:240px;">
+                        <summary style="cursor:pointer; color:var(--accent-urgent); font-size:13.5px; font-weight:700; padding:11px 0;">Reject this request</summary>
+                        <form asp-controller="RentalApplication" asp-action="Reject" asp-route-id="@application.ApplicationID" method="post" style="margin-top:10px;">
+                            <div class="form-row">
+                                <label for="reason-@application.ApplicationID">Reason for rejection</label>
+                                <textarea id="reason-@application.ApplicationID" name="reason" rows="2" required maxlength="500"
+                                          placeholder="e.g. Property no longer available for the requested move-in date"></textarea>
+                            </div>
+                            <button type="submit" class="btn-primary btn-inline btn-danger" style="margin-top:0;">Confirm rejection</button>
+                        </form>
+                    </details>
+                </div>
+            }
+        </div>
+    }
+</div>

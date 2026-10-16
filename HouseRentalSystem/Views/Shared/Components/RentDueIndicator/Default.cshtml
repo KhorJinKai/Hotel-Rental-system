@@ -1,0 +1,8 @@
+@model int
+@if (Model > 0)
+{
+    <span class="nav-dot"
+          role="img"
+          aria-label="Rent payment overdue"
+          title="@(Model == 1 ? "You have rent due" : $"You have {Model} rent payments due")"></span>
+}

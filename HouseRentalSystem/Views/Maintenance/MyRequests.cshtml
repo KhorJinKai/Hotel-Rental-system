@@ -1,0 +1,72 @@
+@model List<HouseRentalSystem.Models.MaintenanceRequest>
+@using HouseRentalSystem.Models
+@{
+    ViewData["Title"] = "My maintenance requests";
+
+    string StatusClass(MaintenanceStatus status) => status switch
+    {
+        MaintenanceStatus.Resolved => "status-approved",
+        MaintenanceStatus.InProgress => "status-pending",
+        _ => "status-neutral"
+    };
+
+    string StatusLabel(MaintenanceStatus status) => status switch
+    {
+        MaintenanceStatus.InProgress => "In progress",
+        _ => status.ToString()
+    };
+}
+
+<div class="container page-section" style="max-width:760px;">
+
+    <div class="results-head">
+        <div>
+            <h1>My maintenance requests</h1>
+            <span class="result-count">@Model.Count request@(Model.Count == 1 ? "" : "s")</span>
+        </div>
+    </div>
+
+    @if (!Model.Any())
+    {
+        <div class="empty-state">
+            <div class="icon">&#128295;</div>
+            <h3>No maintenance requests yet</h3>
+            <p>If something needs fixing at a property you rent, report it from the rental agreement page.</p>
+        </div>
+    }
+
+    @foreach (var request in Model)
+    {
+        <div class="checkout-card" style="margin-bottom:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+                <div>
+                    <div style="font-size:16px; font-weight:700;">@request.Title</div>
+                    <div style="font-size:13px; color:var(--text-secondary);">@request.Property?.Title &middot; @request.Property?.City</div>
+                </div>
+                <span class="status-pill @StatusClass(request.Status)">@StatusLabel(request.Status)</span>
+            </div>
+            <p style="margin:12px 0 0; font-size:14px; color:var(--text-secondary);">@request.Description</p>
+            @if (!string.IsNullOrEmpty(request.PhotoPath))
+            {
+                <img src="@request.PhotoPath" alt="Issue photo" style="max-width:200px; border-radius:8px; margin-top:12px;" />
+            }
+            <div style="margin-top:12px; font-size:12px; color:var(--text-muted);">
+                Reported @request.SubmittedDate.ToString("d MMM yyyy")
+                @if (request.ResolvedDate.HasValue)
+                {
+                    @:&middot; Resolved @request.ResolvedDate.Value.ToString("d MMM yyyy")
+                }
+            </div>
+
+            @if (!string.IsNullOrEmpty(request.AdminReply))
+            {
+                <div style="margin-top:14px; padding:12px; border-radius:8px; background:var(--surface-sunken);">
+                    <div style="font-size:12px; font-weight:600; color:var(--text-secondary);">
+                        Reply from support &middot; @request.RepliedDate!.Value.ToString("d MMM yyyy, h:mm tt")
+                    </div>
+                    <p style="margin:6px 0 0; font-size:13.5px;">@request.AdminReply</p>
+                </div>
+            }
+        </div>
+    }
+</div>

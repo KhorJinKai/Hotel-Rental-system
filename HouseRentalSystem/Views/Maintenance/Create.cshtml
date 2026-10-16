@@ -1,0 +1,47 @@
+@model HouseRentalSystem.Models.MaintenanceRequestViewModel
+@{
+    ViewData["Title"] = "Report an issue";
+}
+
+<div class="container page-section" style="max-width:640px;">
+
+    <div class="results-head">
+        <div>
+            <h1>Report a maintenance issue</h1>
+            <span class="result-count">@Model.PropertyTitle</span>
+        </div>
+        <a class="btn-outline" asp-controller="Maintenance" asp-action="MyRequests">My requests</a>
+    </div>
+
+    <div class="checkout-card">
+        <form asp-controller="Maintenance" asp-action="Create" method="post" enctype="multipart/form-data">
+            <div asp-validation-summary="All" class="text-danger"></div>
+            <input type="hidden" asp-for="PropertyID" />
+            <input type="hidden" asp-for="PropertyTitle" />
+
+            <div class="form-row">
+                <label asp-for="Title">What's the issue?</label>
+                <input asp-for="Title" placeholder="e.g. Leaking kitchen tap" />
+                <span asp-validation-for="Title" class="text-danger"></span>
+            </div>
+
+            <div class="form-row">
+                <label asp-for="Description">Details</label>
+                <textarea asp-for="Description" rows="5" placeholder="Describe the issue, when it started, and anything the owner should know."></textarea>
+                <span asp-validation-for="Description" class="text-danger"></span>
+                <div class="field-hint">Between 10 and 1000 characters.</div>
+            </div>
+
+            <div class="form-row">
+                <label for="photo">Photo (optional)</label>
+                <input type="file" id="photo" name="photo" accept="image/*" />
+            </div>
+
+            <button type="submit" class="btn-primary">Submit request</button>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

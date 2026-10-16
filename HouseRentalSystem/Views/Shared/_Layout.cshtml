@@ -1,0 +1,285 @@
+@using HouseRentalSystem.Services
+@using System.Security.Claims
+@inject AdminAlertsService AdminAlerts
+@{
+    // Pending-work counts for the admin: drives the alert banner below and the red dots
+    // on the admin nav links. Computed once here (AdminAlertsService is request-scoped).
+    var adminAlerts = User.IsInRole("Admin") ? await AdminAlerts.GetAsync() : null;
+
+    var displayName = User.Identity?.Name ?? "";
+    var initials = string.IsNullOrWhiteSpace(displayName)
+        ? "?"
+        : string.Concat(displayName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                                   .Take(2)
+                                   .Select(part => part[0]));
+    var roleLabel = User.IsInRole("Owner") ? "Property owner"
+                  : User.IsInRole("Tenant") ? "Tenant"
+                  : User.IsInRole("Admin") ? "Administrator"
+                  : "Member";
+    var profilePhoto = User.FindFirstValue(AuthClaims.ProfilePhotoClaimType);
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - RentEasy</title>
+    <script>
+        // Applied before the stylesheet loads so there's no flash of the wrong theme.
+        // A saved choice always wins; otherwise this follows the OS preference once
+        // and the site.js toggle takes over (and persists) from there.
+        (function () {
+            var saved = localStorage.getItem("theme");
+            var theme = saved || (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+            document.documentElement.setAttribute("data-theme", theme);
+        })();
+    </script>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+
+    <header class="site-header" id="siteHeader">
+        <div class="container">
+            <a class="brand-logo" asp-controller="Home" asp-action="Index">
+                <span class="brand-mark">&#127968;</span>
+                <span>Rent<span class="brand-easy">Easy</span></span>
+            </a>
+
+            <nav class="nav-links">
+                <a asp-controller="Home" asp-action="Index">Browse rentals</a>
+
+                @if (User.Identity != null && User.Identity.IsAuthenticated)
+                {
+                    @if (User.IsInRole("Owner"))
+                    {
+                        <a asp-controller="Property" asp-action="MyListings">My listings</a>
+                        <a asp-controller="RentalApplication" asp-action="OwnerRequests">Booking requests</a>
+                        <a asp-controller="RentalAgreement" asp-action="RentCollection">Rent collection</a>
+                        <a asp-controller="Maintenance" asp-action="OwnerRequests">Maintenance reports</a>
+                    }
+                    @if (User.IsInRole("Tenant"))
+                    {
+                        <a asp-controller="RentalApplication" asp-action="MyBookings" class="nav-has-dot">My bookings @await Component.InvokeAsync("RentDueIndicator")</a>
+                        <a asp-controller="Maintenance" asp-action="MyRequests">Maintenance</a>
+                    }
+                    @if (User.IsInRole("Owner") || User.IsInRole("Tenant"))
+                    {
+                        <a asp-controller="AgreementRequest" asp-action="MyRequests">My requests</a>
+                        <a asp-controller="Support" asp-action="Index">Support</a>
+                    }
+                    @if (User.IsInRole("Admin"))
+                    {
+                        <a asp-controller="Admin" asp-action="Index" class="nav-has-dot">
+                            Admin dashboard
+                            @if (adminAlerts?.PendingRequests > 0)
+                            {
+                                <span class="nav-dot" role="img"
+                                      aria-label="@adminAlerts.PendingRequests cancellation or refund request(s) waiting"
+                                      title="@adminAlerts.PendingRequests cancellation / refund request(s) waiting"></span>
+                            }
+                        </a>
+                        <a asp-controller="Admin" asp-action="BookingApprovals" class="nav-has-dot">
+                            Booking approvals
+                            @if (adminAlerts?.PendingBookingApprovals > 0)
+                            {
+                                <span class="nav-dot" role="img"
+                                      aria-label="@adminAlerts.PendingBookingApprovals booking(s) awaiting approval"
+                                      title="@adminAlerts.PendingBookingApprovals booking(s) awaiting approval"></span>
+                            }
+                        </a>
+                        <a asp-controller="Admin" asp-action="Support" class="nav-has-dot">
+                            Support inbox
+                            @if (adminAlerts?.AwaitingSupportReply > 0)
+                            {
+                                <span class="nav-dot" role="img"
+                                      aria-label="@adminAlerts.AwaitingSupportReply support ticket(s) awaiting reply"
+                                      title="@adminAlerts.AwaitingSupportReply support ticket(s) awaiting reply"></span>
+                            }
+                        </a>
+                        <a asp-controller="Admin" asp-action="Maintenance" class="nav-has-dot">
+                            Maintenance
+                            @if (adminAlerts?.PendingMaintenance > 0)
+                            {
+                                <span class="nav-dot" role="img"
+                                      aria-label="@adminAlerts.PendingMaintenance maintenance request(s) awaiting reply"
+                                      title="@adminAlerts.PendingMaintenance maintenance request(s) awaiting reply"></span>
+                            }
+                        </a>
+                    }
+
+                    <div class="user-menu" id="userMenu">
+                        <button type="button" class="user-menu-trigger" id="userMenuTrigger" aria-expanded="false">
+                            @if (!string.IsNullOrEmpty(profilePhoto))
+                            {
+                                <img src="@profilePhoto" alt="" class="avatar" style="object-fit:cover;" />
+                            }
+                            else
+                            {
+                                <span class="avatar">@initials</span>
+                            }
+                            <span>@displayName.Split(' ').First()</span>
+                            <span aria-hidden="true">&#9662;</span>
+                        </button>
+                        <div class="user-menu-panel" id="userMenuPanel">
+                            <div class="menu-head">
+                                <strong>@displayName</strong>
+                                <span>@roleLabel</span>
+                            </div>
+                            <a asp-controller="Profile" asp-action="Index">My profile</a>
+                            @if (User.IsInRole("Owner"))
+                            {
+                                <a asp-controller="Property" asp-action="MyListings">My listings</a>
+                                <a asp-controller="Property" asp-action="Create">List a new property</a>
+                                <a asp-controller="RentalApplication" asp-action="OwnerRequests">Booking requests</a>
+                                <a asp-controller="RentalAgreement" asp-action="RentCollection">Rent collection</a>
+                                <a asp-controller="Maintenance" asp-action="OwnerRequests">Maintenance reports</a>
+                            }
+                            @if (User.IsInRole("Tenant"))
+                            {
+                                <a asp-controller="RentalApplication" asp-action="MyBookings" class="nav-has-dot">My bookings @await Component.InvokeAsync("RentDueIndicator")</a>
+                                <a asp-controller="Maintenance" asp-action="MyRequests">Maintenance requests</a>
+                            }
+                            @if (User.IsInRole("Owner") || User.IsInRole("Tenant"))
+                            {
+                                <a asp-controller="AgreementRequest" asp-action="MyRequests">My requests</a>
+                                <a asp-controller="Support" asp-action="Index">Support</a>
+                            }
+                            @if (User.IsInRole("Admin"))
+                            {
+                                <a asp-controller="Admin" asp-action="Index">Admin dashboard</a>
+                                <a asp-controller="Admin" asp-action="BookingApprovals" class="nav-has-dot">
+                                    Booking approvals
+                                    @if (adminAlerts?.PendingBookingApprovals > 0)
+                                    {
+                                        <span class="nav-dot" aria-hidden="true"></span>
+                                    }
+                                </a>
+                                <a asp-controller="Admin" asp-action="Users">Manage users</a>
+                                <a asp-controller="Admin" asp-action="Properties">Manage listings</a>
+                                <a asp-controller="Admin" asp-action="Requests" class="nav-has-dot">
+                                    Cancellation &amp; refund requests
+                                    @if (adminAlerts?.PendingRequests > 0)
+                                    {
+                                        <span class="nav-dot" aria-hidden="true"></span>
+                                    }
+                                </a>
+                                <a asp-controller="Admin" asp-action="Support" class="nav-has-dot">
+                                    Support inbox
+                                    @if (adminAlerts?.AwaitingSupportReply > 0)
+                                    {
+                                        <span class="nav-dot" aria-hidden="true"></span>
+                                    }
+                                </a>
+                                <a asp-controller="Admin" asp-action="Maintenance" class="nav-has-dot">
+                                    Maintenance requests
+                                    @if (adminAlerts?.PendingMaintenance > 0)
+                                    {
+                                        <span class="nav-dot" aria-hidden="true"></span>
+                                    }
+                                </a>
+                            }
+                            <form asp-controller="Security" asp-action="Logout" method="post" class="menu-form">
+                                <button type="submit" class="danger">Sign out</button>
+                            </form>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <a asp-controller="Security" asp-action="Register">Create account</a>
+                    <a class="nav-cta" asp-controller="Security" asp-action="Login">Sign in</a>
+                }
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        @if (TempData["Notification"] != null)
+        {
+            <div class="container">
+                <div class="toast"><span class="toast-icon">&#8505;</span> @TempData["Notification"]</div>
+            </div>
+        }
+        @if (adminAlerts is { Any: true })
+        {
+            <div class="container">
+                <div class="toast toast-alert" id="adminAlertBar" data-alert-total="@adminAlerts.Total" role="status">
+                    <span class="toast-icon">&#128276;</span>
+                    <span class="toast-alert-text">
+                        <strong>@adminAlerts.Total item@(adminAlerts.Total == 1 ? "" : "s") @(adminAlerts.Total == 1 ? "needs" : "need") your attention:</strong>
+                        @if (adminAlerts.PendingBookingApprovals > 0)
+                        {
+                            <a asp-controller="Admin" asp-action="BookingApprovals">@adminAlerts.PendingBookingApprovals booking approval@(adminAlerts.PendingBookingApprovals == 1 ? "" : "s")</a>
+                        }
+                        @if (adminAlerts.PendingMaintenance > 0)
+                        {
+                            <a asp-controller="Admin" asp-action="Maintenance">@adminAlerts.PendingMaintenance maintenance request@(adminAlerts.PendingMaintenance == 1 ? "" : "s")</a>
+                        }
+                        @if (adminAlerts.AwaitingSupportReply > 0)
+                        {
+                            <a asp-controller="Admin" asp-action="Support">@adminAlerts.AwaitingSupportReply support ticket@(adminAlerts.AwaitingSupportReply == 1 ? "" : "s")</a>
+                        }
+                        @if (adminAlerts.PendingRequests > 0)
+                        {
+                            <a asp-controller="Admin" asp-action="Requests">@adminAlerts.PendingRequests cancellation / refund request@(adminAlerts.PendingRequests == 1 ? "" : "s")</a>
+                        }
+                    </span>
+                    <button type="button" class="toast-alert-close" id="adminAlertDismiss" aria-label="Dismiss until a new request arrives">&times;</button>
+                </div>
+            </div>
+        }
+        @RenderBody()
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div>
+                    <a class="footer-brand" asp-controller="Home" asp-action="Index">Rent<span class="brand-easy">Easy</span></a>
+                    <p>Malaysia's student-built rental marketplace. Verified owners, transparent monthly pricing, and a signed agreement before any money changes hands.</p>
+                </div>
+                <div>
+                    <h4>Renting</h4>
+                    <ul>
+                        <li><a asp-controller="Home" asp-action="Index">Search rentals</a></li>
+                        <li><a asp-controller="Home" asp-action="Index" asp-route-sortBy="price_low">Lowest rent first</a></li>
+                        <li><a asp-controller="Home" asp-action="Index" asp-route-sortBy="rating">Top reviewed homes</a></li>
+                        <li><a asp-controller="Home" asp-action="Index" asp-route-sortBy="newest">New listings</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4>Owners</h4>
+                    <ul>
+                        <li><a asp-controller="Property" asp-action="Create">List your property</a></li>
+                        <li><a asp-controller="RentalApplication" asp-action="OwnerRequests">Manage requests</a></li>
+                        <li><a asp-controller="RentalAgreement" asp-action="RentCollection">Rent collection</a></li>
+                        <li><a asp-controller="Property" asp-action="MyListings">My listings</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4>Company</h4>
+                    <ul>
+                        <li><a asp-controller="Home" asp-action="Privacy">Privacy policy</a></li>
+                        <li><a asp-controller="Security" asp-action="Register">Create an account</a></li>
+                        <li><a asp-controller="Security" asp-action="Login">Sign in</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="footer-bottom">
+                <span>&copy; @DateTime.Now.Year RentEasy — House / Room Rental System. Student project for AMIT2014 Web and Mobile Systems.</span>
+                <span class="pay-marks">
+                    <span>VISA</span>
+                    <span>Mastercard</span>
+                    <span>FPX</span>
+                    <span>Stripe</span>
+                </span>
+            </div>
+        </div>
+    </footer>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

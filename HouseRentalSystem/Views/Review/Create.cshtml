@@ -1,0 +1,50 @@
+@model HouseRentalSystem.Models.ReviewViewModel
+@{
+    ViewData["Title"] = "Leave a review";
+}
+
+<div class="container page-section" style="max-width:640px;">
+
+    <div class="results-head">
+        <div>
+            <h1>Leave a review</h1>
+            <span class="result-count">@Model.PropertyTitle &middot; hosted by @Model.OwnerName</span>
+        </div>
+    </div>
+
+    <div class="checkout-card">
+        <form asp-controller="Review" asp-action="Create" method="post">
+            <div asp-validation-summary="All" class="text-danger"></div>
+            <input type="hidden" asp-for="AgreementID" />
+            <input type="hidden" asp-for="PropertyTitle" />
+            <input type="hidden" asp-for="OwnerName" />
+
+            <div class="form-row">
+                <label asp-for="Rating">Your rating</label>
+                <div class="check-row" style="gap:18px;">
+                    @for (int star = 5; star >= 1; star--)
+                    {
+                        <label style="display:inline-flex; align-items:center; gap:4px; font-weight:600;">
+                            <input type="radio" name="Rating" value="@star" checked="@(Model.Rating == star)" />
+                            @star <span class="star">&#9733;</span>
+                        </label>
+                    }
+                </div>
+                <span asp-validation-for="Rating" class="text-danger"></span>
+            </div>
+
+            <div class="form-row">
+                <label asp-for="Comment">Your review</label>
+                <textarea asp-for="Comment" rows="5" placeholder="How was your stay? Would you recommend this place to other tenants?"></textarea>
+                <span asp-validation-for="Comment" class="text-danger"></span>
+                <div class="field-hint">Between 10 and 500 characters.</div>
+            </div>
+
+            <button type="submit" class="btn-primary">Submit review</button>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

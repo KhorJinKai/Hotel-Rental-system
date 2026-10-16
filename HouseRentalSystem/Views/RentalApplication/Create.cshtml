@@ -1,0 +1,99 @@
+@model HouseRentalSystem.Models.RentalApplicationViewModel
+@{
+    ViewData["Title"] = "Request to book";
+}
+
+<div class="container page-section">
+
+    <div class="steps" style="max-width:760px;">
+        <div class="step done"><span class="step-num">&#10003;</span>Property</div>
+        <div class="step active"><span class="step-num">2</span>Your details</div>
+        <div class="step"><span class="step-num">3</span>Agreement &amp; payment</div>
+    </div>
+
+    <div class="prop-layout">
+        <div>
+            <div class="checkout-card">
+                <h1 style="font-size:20px; margin:0 0 4px;">Almost done — tell us about you</h1>
+                <p style="color:var(--text-secondary); font-size:13.5px; margin:0 0 20px;">
+                    Next you'll review the tenancy agreement and pay the security deposit. Your request only
+                    reaches the owner once that's done.
+                </p>
+
+                <form asp-controller="RentalApplication" asp-action="Create" method="post">
+                    <div asp-validation-summary="All" class="text-danger"></div>
+                    <input type="hidden" asp-for="PropertyID" />
+                    <input type="hidden" asp-for="PropertyTitle" />
+                    <input type="hidden" asp-for="PropertyCity" />
+                    <input type="hidden" asp-for="RentPrice" />
+                    <input type="hidden" asp-for="Deposit" />
+                    <input type="hidden" asp-for="PrimaryPhotoPath" />
+
+                    <div class="form-grid-2">
+                        <div class="form-row">
+                            <label asp-for="MoveInDate">Move-in date</label>
+                            <input asp-for="MoveInDate" type="date" />
+                            <span asp-validation-for="MoveInDate" class="text-danger"></span>
+                        </div>
+
+                        <div class="form-row">
+                            <label asp-for="RentalDurationMonths">Rental duration</label>
+                            <select asp-for="RentalDurationMonths">
+                                <option value="6">6 months</option>
+                                <option value="9">9 months</option>
+                                <option value="12">12 months</option>
+                                <option value="18">18 months</option>
+                                <option value="24">24 months</option>
+                            </select>
+                            <span asp-validation-for="RentalDurationMonths" class="text-danger"></span>
+                            <div class="field-hint">Minimum rental duration is 6 months.</div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <label asp-for="Message">Message to owner (optional)</label>
+                        <textarea asp-for="Message" rows="4" placeholder="Tell the owner a bit about yourself, e.g. move-in circumstances, number of occupants..."></textarea>
+                        <span asp-validation-for="Message" class="text-danger"></span>
+                        <div class="field-hint">Maximum 500 characters.</div>
+                    </div>
+
+                    <button type="submit" class="btn-primary">Continue to agreement</button>
+                    <p class="panel-note">
+                        You'll be asked to accept the tenancy agreement and pay the security deposit next.
+                    </p>
+                </form>
+            </div>
+        </div>
+
+        <aside class="summary-card">
+            <div class="summary-photo">
+                @if (!string.IsNullOrEmpty(Model.PrimaryPhotoPath))
+                {
+                    <img src="@Model.PrimaryPhotoPath" alt="@Model.PropertyTitle" />
+                }
+            </div>
+            <div class="summary-body">
+                <h3>@Model.PropertyTitle</h3>
+                <div style="font-size:13px; color:var(--text-secondary);">&#128205; @Model.PropertyCity</div>
+
+                <div class="price-breakdown">
+                    <div class="row"><span>Monthly rent</span><span>RM @Model.RentPrice.ToString("N0")</span></div>
+                    <div class="row total"><span>Deposit due now</span><span>RM @Model.Deposit.ToString("N0")</span></div>
+                </div>
+                <p style="font-size:11.5px; color:var(--text-muted); margin:-4px 0 0;">
+                    Rent instalments start once your booking is fully approved.
+                </p>
+
+                <ul class="panel-perks">
+                    <li><span class="tick">&#10003;</span> No booking fee</li>
+                    <li><span class="tick">&#10003;</span> Full refund if the owner or admin declines</li>
+                    <li><span class="tick">&#10003;</span> Secure card payment via Stripe</li>
+                </ul>
+            </div>
+        </aside>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

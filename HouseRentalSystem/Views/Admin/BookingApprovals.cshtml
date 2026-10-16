@@ -1,0 +1,110 @@
+@model List<HouseRentalSystem.Models.RentalApplication>
+@using HouseRentalSystem.Models
+@{
+    ViewData["Title"] = "Booking approvals";
+    var status = ViewBag.Status as ApplicationStatus?;
+
+    string StatusClass(ApplicationStatus s) => s switch
+    {
+        ApplicationStatus.Approved => "status-approved",
+        ApplicationStatus.Rejected => "status-rejected",
+        _ => "status-pending"
+    };
+}
+
+<div class="container page-section">
+
+    <div class="results-head">
+        <div>
+            <h1>Booking approvals</h1>
+            <span class="result-count">@Model.Count application@(Model.Count == 1 ? "" : "s")</span>
+        </div>
+        <a class="btn-outline" asp-controller="Admin" asp-action="Index">Back to dashboard</a>
+    </div>
+
+    <p class="section-subtitle" style="margin-bottom:18px;">
+        The tenant has already accepted the agreement and paid the deposit, and the owner has approved -
+        approving here activates the agreement and adds the rent schedule. Rejecting refunds the deposit in full.
+    </p>
+
+    <form method="get" asp-controller="Admin" asp-action="BookingApprovals" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px;">
+        <select name="status" style="min-width:200px;">
+            <option value="">Awaiting approval + decided</option>
+            <option value="@ApplicationStatus.PendingAdminApproval" selected="@(status == ApplicationStatus.PendingAdminApproval)">Awaiting approval</option>
+            <option value="@ApplicationStatus.Approved" selected="@(status == ApplicationStatus.Approved)">Approved</option>
+            <option value="@ApplicationStatus.Rejected" selected="@(status == ApplicationStatus.Rejected)">Rejected</option>
+        </select>
+        <button type="submit" class="btn-outline btn-inline" style="margin-top:0;">Filter</button>
+    </form>
+
+    @if (!Model.Any())
+    {
+        <div class="empty-state">
+            <div class="icon">&#128237;</div>
+            <h3>No applications match this filter</h3>
+        </div>
+    }
+
+    @foreach (var application in Model)
+    {
+        <div class="checkout-card" style="margin-bottom:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; padding-bottom:14px; border-bottom:1px solid var(--border-color);">
+                <div>
+                    <div style="font-size:16px; font-weight:700;">@application.Property?.Title</div>
+                    <div style="font-size:13px; color:var(--text-secondary);">
+                        &#128205; @application.Property?.City &middot; Owner: @application.Property?.Owner?.FullName
+                    </div>
+                </div>
+                <span class="status-pill @StatusClass(application.Status)">
+                    @(application.Status == ApplicationStatus.PendingAdminApproval ? "Awaiting approval" : application.Status.ToString())
+                </span>
+            </div>
+
+            <div style="margin-top:14px;">
+                <table class="data-table">
+                    <tbody>
+                        <tr><td style="width:170px;">Tenant</td><td><strong>@application.Tenant?.FullName</strong></td></tr>
+                        <tr><td>Email</td><td>@application.Tenant?.Email</td></tr>
+                        <tr><td>Move-in date</td><td><strong>@application.MoveInDate.ToString("d MMM yyyy")</strong></td></tr>
+                        <tr><td>Duration</td><td>@application.RentalDurationMonths months</td></tr>
+                        <tr><td>Monthly rent</td><td>RM @application.Property?.RentPrice.ToString("N0")</td></tr>
+                        <tr><td>Applied</td><td>@application.AppliedDate.ToString("d MMM yyyy, h:mm tt")</td></tr>
+                        @if (application.Status == ApplicationStatus.Rejected && !string.IsNullOrEmpty(application.RejectionReason))
+                        {
+                            <tr><td>Admin note</td><td style="color:var(--accent-urgent);">@application.RejectionReason</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (application.Status == ApplicationStatus.PendingAdminApproval)
+            {
+                <div style="margin-top:14px;">
+                    <a class="btn-outline" asp-controller="RentalAgreement" asp-action="Details" asp-route-applicationId="@application.ApplicationID">View rental agreement &rarr;</a>
+                </div>
+                <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; align-items:flex-end;">
+                    <form asp-controller="Admin" asp-action="ApproveBooking" asp-route-id="@application.ApplicationID" method="post"
+                          onsubmit="return confirm('Approve this booking? This activates the rental agreement and adds the rent schedule.');">
+                        <button type="submit" class="btn-primary btn-inline" style="margin-top:0;">Approve booking</button>
+                    </form>
+
+                    <form asp-controller="Admin" asp-action="RejectBooking" asp-route-id="@application.ApplicationID" method="post"
+                          style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;"
+                          onsubmit="return confirm('Reject this booking? The listing will become available again and the deposit will be refunded.');">
+                        <div class="form-row" style="margin:0; flex:1; min-width:220px;">
+                            <label style="font-size:12px;">Note (optional)</label>
+                            <input type="text" name="adminNote" placeholder="Visible to the tenant" style="margin-top:2px;" />
+                        </div>
+                        <button type="submit" class="btn-outline btn-inline" style="margin-top:0; color:var(--accent-urgent); border-color:var(--accent-urgent);">Reject booking</button>
+                    </form>
+                </div>
+            }
+            else if (application.Status == ApplicationStatus.Approved)
+            {
+                <div style="margin-top:14px;">
+                    <a class="btn-outline" asp-controller="RentalAgreement" asp-action="Details" asp-route-applicationId="@application.ApplicationID">View rental agreement &rarr;</a>
+                </div>
+            }
+        </div>
+    }
+</div>

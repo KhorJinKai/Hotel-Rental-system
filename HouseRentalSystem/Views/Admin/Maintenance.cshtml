@@ -1,0 +1,129 @@
+@model List<HouseRentalSystem.Models.MaintenanceRequest>
+@using HouseRentalSystem.Models
+@{
+    ViewData["Title"] = "Maintenance requests";
+    var status = ViewBag.Status as MaintenanceStatus?;
+
+    string StatusClass(MaintenanceStatus s) => s switch
+    {
+        MaintenanceStatus.Resolved => "status-approved",
+        MaintenanceStatus.InProgress => "status-pending",
+        _ => "status-neutral"
+    };
+
+    string StatusLabel(MaintenanceStatus s) => s switch
+    {
+        MaintenanceStatus.InProgress => "In progress",
+        _ => s.ToString()
+    };
+
+    var awaitingCount = Model.Count(r => r.RepliedDate == null);
+}
+
+<div class="container page-section" style="max-width:820px;">
+
+    <div class="results-head">
+        <div>
+            <h1>Maintenance requests</h1>
+            <span class="result-count">
+                @Model.Count total
+                @if (awaitingCount > 0)
+                {
+                    @:&middot; @awaitingCount awaiting reply
+                }
+            </span>
+        </div>
+        <a class="btn-outline" asp-controller="Admin" asp-action="Index">Back to dashboard</a>
+    </div>
+
+    <form method="get" asp-controller="Admin" asp-action="Maintenance" class="filter-bar">
+        <select name="status" aria-label="Filter by status" style="min-width:170px;">
+            <option value="">All statuses</option>
+            @foreach (var s in Enum.GetValues<MaintenanceStatus>())
+            {
+                <option value="@s" selected="@(status == s)">@StatusLabel(s)</option>
+            }
+        </select>
+        <button type="submit" class="btn-outline btn-inline" style="margin-top:0;">Filter</button>
+    </form>
+
+    @if (!Model.Any())
+    {
+        <div class="empty-state">
+            <div class="icon">&#128295;</div>
+            <h3>No maintenance requests match this filter</h3>
+        </div>
+    }
+
+    @foreach (var request in Model)
+    {
+        var awaitingReply = request.RepliedDate == null;
+        <div class="checkout-card admin-request-card @(awaitingReply ? "is-awaiting" : "")">
+            <div class="admin-request-head">
+                <div>
+                    <div class="admin-request-title">@request.Title</div>
+                    <div class="admin-request-meta">
+                        @request.Property?.Title
+                        <span class="dot-sep"></span> owner: @request.Property?.Owner?.FullName
+                        <span class="dot-sep"></span> reported by @request.Tenant?.FullName
+                    </div>
+                </div>
+                <div class="admin-request-pills">
+                    @if (awaitingReply)
+                    {
+                        <span class="status-pill status-attention">Awaiting reply</span>
+                    }
+                    <span class="status-pill @StatusClass(request.Status)">@StatusLabel(request.Status)</span>
+                </div>
+            </div>
+
+            <p class="admin-request-body">@request.Description</p>
+
+            @if (!string.IsNullOrEmpty(request.PhotoPath))
+            {
+                <img src="@request.PhotoPath" alt="Issue photo" class="admin-request-photo" />
+            }
+
+            <div class="admin-request-dates">
+                Reported @request.SubmittedDate.ToString("d MMM yyyy")
+                @if (request.ResolvedDate.HasValue)
+                {
+                    <span class="dot-sep"></span> @:Resolved @request.ResolvedDate.Value.ToString("d MMM yyyy")
+                }
+            </div>
+
+            @if (!awaitingReply)
+            {
+                <div class="admin-reply-quote">
+                    <div class="admin-reply-quote-head">
+                        Your reply to the tenant &middot; @request.RepliedDate!.Value.ToString("d MMM yyyy, h:mm tt")
+                        @if (request.RepliedByAdmin != null)
+                        {
+                            @:(@request.RepliedByAdmin.FullName)
+                        }
+                    </div>
+                    <p>@request.AdminReply</p>
+                </div>
+            }
+
+            <form asp-controller="Admin" asp-action="MaintenanceReply" asp-route-id="@request.RequestID" method="post" class="admin-reply-form">
+                <label for="reply-@request.RequestID">@(awaitingReply ? "Reply to the tenant" : "Edit your reply")</label>
+                <textarea id="reply-@request.RequestID" name="adminReply" rows="3" maxlength="1000"
+                          placeholder="Reply to the tenant about this issue...">@request.AdminReply</textarea>
+                <div class="admin-reply-actions">
+                    <label class="admin-reply-status">
+                        <span>Status</span>
+                        <select name="status">
+                            <option value="@MaintenanceStatus.Open" selected="@(request.Status == MaintenanceStatus.Open)">Open</option>
+                            <option value="@MaintenanceStatus.InProgress" selected="@(request.Status == MaintenanceStatus.InProgress)">In progress</option>
+                            <option value="@MaintenanceStatus.Resolved" selected="@(request.Status == MaintenanceStatus.Resolved)">Resolved</option>
+                        </select>
+                    </label>
+                    <button type="submit" class="btn-primary btn-inline">
+                        @(awaitingReply ? "Send reply & notify owner" : "Update reply")
+                    </button>
+                </div>
+            </form>
+        </div>
+    }
+</div>

@@ -1,0 +1,60 @@
+@model HouseRentalSystem.Models.Property
+@{
+    ViewData["Title"] = "Delete listing";
+    var hasBookingHistory = ViewBag.HasBookingHistory is bool b && b;
+    var primaryPhoto = Model.Photos?.FirstOrDefault(p => p.IsPrimary)?.PhotoPath ?? Model.Photos?.FirstOrDefault()?.PhotoPath;
+    var mapsUrl = "https://www.google.com/maps/search/?api=1&query=" + Uri.EscapeDataString($"{Model.Address}, {Model.City}");
+}
+
+<div class="container page-section" style="max-width:640px;">
+
+    <div class="results-head">
+        <div>
+            <h1>Delete listing</h1>
+            <span class="result-count">This can't be undone.</span>
+        </div>
+        <a class="btn-outline" asp-controller="Property" asp-action="MyListings">Back to my listings</a>
+    </div>
+
+    <div class="checkout-card">
+        <div style="display:flex; gap:14px; align-items:center; padding-bottom:16px; border-bottom:1px solid var(--border-color);">
+            <div style="width:72px; height:72px; border-radius:10px; overflow:hidden; flex-shrink:0; background:var(--bg-subtle);">
+                @if (!string.IsNullOrEmpty(primaryPhoto))
+                {
+                    <img src="@primaryPhoto" alt="@Model.Title" style="width:100%; height:100%; object-fit:cover;" />
+                }
+            </div>
+            <div>
+                <p style="font-weight:700; margin:0 0 2px;">@Model.Title</p>
+                <p style="font-size:13px; margin:0;">&#128205; <a href="@mapsUrl" target="_blank" rel="noopener noreferrer">@Model.Address, @Model.City</a></p>
+            </div>
+        </div>
+
+        @if (hasBookingHistory)
+        {
+            <div class="arrears-banner level-1" style="margin-top:16px;">
+                <div class="arrears-head">
+                    <strong>This listing can't be deleted</strong>
+                </div>
+                <p class="arrears-next">
+                    It has booking history (past or current rental applications) that must be kept for the record.
+                    Mark it as unavailable instead so it stops appearing in search results.
+                </p>
+                <form asp-controller="Property" asp-action="ToggleAvailability" asp-route-id="@Model.PropertyID" method="post" style="margin-top:12px;">
+                    <button type="submit" class="btn-primary btn-inline">
+                        Mark as @(Model.IsAvailable ? "not available" : "available") instead
+                    </button>
+                </form>
+            </div>
+        }
+        else
+        {
+            <p style="margin:16px 0; color:var(--text-secondary); font-size:14px;">
+                Deleting this listing will permanently remove it and its photos. It has no booking history yet, so this is safe.
+            </p>
+            <form asp-controller="Property" asp-action="Delete" asp-route-id="@Model.PropertyID" method="post">
+                <button type="submit" class="btn-primary" style="background:var(--accent-urgent);">Yes, delete this listing</button>
+            </form>
+        }
+    </div>
+</div>

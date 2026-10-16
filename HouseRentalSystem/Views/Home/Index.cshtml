@@ -1,0 +1,196 @@
+@model HouseRentalSystem.Models.HomeSearchViewModel
+@{
+    ViewData["Title"] = "Find your next home to rent";
+
+    // The sort tabs, filter-tag removers, score pills and pagination all need "the
+    // current search, with one thing changed" - that logic lives in SearchRoute now so
+    // the _Results partial can build the same links. This page only needs it for the
+    // "Popular right now" city chips below.
+    var topCities = Model.Results
+        .GroupBy(r => r.City)
+        .OrderByDescending(g => g.Count())
+        .Take(5)
+        .Select(g => g.Key)
+        .ToList();
+}
+
+<section class="hero">
+    <div class="container">
+        <h1>Find your next home to rent</h1>
+        <p>Verified owners. Real tenant reviews. No hidden fees, ever.</p>
+        <div class="hero-trust">
+            <span>&#10003; Free to browse &amp; apply</span>
+            <span>&#10003; Owner-approved bookings</span>
+            <span>&#10003; Secure card payment</span>
+            <span>&#10003; Signed rental agreement</span>
+        </div>
+    </div>
+</section>
+
+<form class="searchbar" asp-controller="Home" asp-action="Index" method="get" asp-antiforgery="false">
+    <input type="hidden" name="sortBy" value="@Model.SortBy" />
+
+    <div class="seg">
+        <label for="Location">Where do you want to live?</label>
+        <input type="text" id="Location" name="location" placeholder="City, area or address"
+               value="@Model.Location" autocomplete="off" />
+        <div id="LocationSuggestions" class="location-suggestions"></div>
+    </div>
+
+    <div class="seg">
+        <label for="MoveInDate">Move-in date</label>
+        <input type="date" id="MoveInDate" name="moveInDate" value="@Model.MoveInDate?.ToString("yyyy-MM-dd")" />
+    </div>
+
+    <div class="seg">
+        <label for="CategoryID">Property type</label>
+        <select id="CategoryID" name="categoryID">
+            <option value="">Any type</option>
+            @foreach (var cat in Model.Categories)
+            {
+                <option value="@cat.CategoryID" selected="@(Model.CategoryID == cat.CategoryID)">@cat.CategoryName</option>
+            }
+        </select>
+    </div>
+
+    <div class="seg">
+        <label for="Bedrooms">Bedrooms</label>
+        <select id="Bedrooms" name="bedrooms">
+            <option value="">Any</option>
+            @for (int b = 1; b <= 4; b++)
+            {
+                var label = $"{b}{(b == 4 ? "+" : "")} bedroom{(b > 1 ? "s" : "")}";
+                <option value="@b" selected="@(Model.Bedrooms == b)">@label</option>
+            }
+        </select>
+    </div>
+
+    <button type="submit" class="btn-cta">SEARCH</button>
+</form>
+
+<div class="container" style="margin-top:18px;">
+    <div class="chip-row">
+        <span class="chip-label">Popular right now:</span>
+        @if (topCities.Any())
+        {
+            foreach (var city in topCities)
+            {
+                var cityRoute = SearchRoute.With(Model, "location", city);
+                var isActive = string.Equals(Model.Location, city, StringComparison.OrdinalIgnoreCase);
+                <a class="chip @(isActive ? "active" : "")"
+                   asp-controller="Home" asp-action="Index" asp-all-route-data="cityRoute">@city</a>
+            }
+        }
+        else
+        {
+            <a class="chip" asp-controller="Home" asp-action="Index">All locations</a>
+        }
+    </div>
+</div>
+
+<div class="container page-section">
+    <div class="results-layout">
+
+        <!-- ---------- Filter rail ---------- -->
+        <aside class="filter-rail">
+            <form class="filter-card" id="filterForm" asp-controller="Home" asp-action="Index" method="get" asp-antiforgery="false">
+                <input type="hidden" name="location" value="@Model.Location" />
+                <input type="hidden" name="moveInDate" value="@Model.MoveInDate?.ToString("yyyy-MM-dd")" />
+                <input type="hidden" name="sortBy" value="@Model.SortBy" />
+                <input type="hidden" name="minScore" value="@Model.MinScore" />
+
+                <div class="filter-head">
+                    <h2>Filter results</h2>
+                    @* Kept in the DOM always so the AJAX search module can show/hide it as
+                       filters come and go without re-rendering the whole rail. *@
+                    <a id="filterClearAll" asp-controller="Home" asp-action="Index"
+                       hidden="@(!Model.HasActiveFilters)">Clear all</a>
+                </div>
+
+                <div class="filter-group">
+                    <h3>Monthly rent (RM)</h3>
+                    <div class="price-inputs">
+                        <input type="number" name="minPrice" id="minPrice" min="0" step="50"
+                               placeholder="Min" value="@Model.MinPrice?.ToString("0")" />
+                        <input type="number" name="maxPrice" id="maxPrice" min="0" step="50"
+                               placeholder="Max" value="@Model.MaxPrice?.ToString("0")" />
+                    </div>
+                    <input type="range" class="range-slider" id="priceSlider"
+                           min="0" max="@Model.PriceCeiling.ToString("0")" step="50"
+                           value="@(Model.MaxPrice.HasValue ? Model.MaxPrice.Value.ToString("0") : Model.PriceCeiling.ToString("0"))" />
+                    <div class="range-readout" id="priceReadout">
+                        Up to RM @((Model.MaxPrice ?? Model.PriceCeiling).ToString("N0")) / month
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <h3>Property type</h3>
+                    @foreach (var cat in Model.Categories)
+                    {
+                        var catCount = Model.CategoryCounts.TryGetValue(cat.CategoryName, out var cc) ? cc : 0;
+                        <label class="check-row">
+                            <input type="radio" name="categoryID" value="@cat.CategoryID"
+                                   checked="@(Model.CategoryID == cat.CategoryID)" />
+                            @cat.CategoryName
+                            <span class="count">@catCount</span>
+                        </label>
+                    }
+                    <label class="check-row">
+                        <input type="radio" name="categoryID" value="" checked="@(!Model.CategoryID.HasValue)" />
+                        Any type
+                    </label>
+                </div>
+
+                <div class="filter-group">
+                    <h3>Bedrooms</h3>
+                    @for (int b = 1; b <= 4; b++)
+                    {
+                        var label = $"{b}{(b == 4 ? "+" : "")} bedroom{(b > 1 ? "s" : "")}";
+                        <label class="check-row">
+                            <input type="radio" name="bedrooms" value="@b" checked="@(Model.Bedrooms == b)" />
+                            @label
+                        </label>
+                    }
+                    <label class="check-row">
+                        <input type="radio" name="bedrooms" value="" checked="@(!Model.Bedrooms.HasValue)" />
+                        Any
+                    </label>
+                </div>
+
+                <div class="filter-group">
+                    <h3>Tenant review score</h3>
+                    <div class="score-pills">
+                        @foreach (var score in new[] { 9, 8, 7, 6 })
+                        {
+                            var isActive = Model.MinScore == score;
+                            var scoreRoute = SearchRoute.With(Model, "minScore", isActive ? null : score.ToString());
+                            <a class="score-pill @(isActive ? "active" : "")"
+                               asp-controller="Home" asp-action="Index" asp-all-route-data="scoreRoute">@score+</a>
+                        }
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <h3>Facilities</h3>
+                    @foreach (var amenity in Model.Amenities)
+                    {
+                        <label class="check-row">
+                            <input type="checkbox" name="amenityIDs" value="@amenity.AmenityID"
+                                   checked="@(Model.AmenityIDs.Contains(amenity.AmenityID))" />
+                            @amenity.AmenityName
+                        </label>
+                    }
+                </div>
+
+                <div class="filter-actions">
+                    <button type="submit" class="btn-primary btn-blue" style="margin-top:0;">Apply filters</button>
+                </div>
+            </form>
+        </aside>
+
+        <!-- ---------- Results (refetched on its own by the AJAX search module) ---------- -->
+        <div id="resultsPanel" data-results-url="@Url.Action("Index", "Home")">
+            <partial name="_Results" model="Model" />
+        </div>
+    </div>
+</div>

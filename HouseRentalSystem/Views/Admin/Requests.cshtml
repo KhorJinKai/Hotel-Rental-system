@@ -1,0 +1,128 @@
+@model List<HouseRentalSystem.Models.AgreementRequest>
+@using HouseRentalSystem.Models
+@{
+    ViewData["Title"] = "Cancellation & refund requests";
+    var status = ViewBag.Status as RequestStatus?;
+    var type = ViewBag.Type as RequestType?;
+
+    string StatusClass(RequestStatus s) => s switch
+    {
+        RequestStatus.Approved => "status-approved",
+        RequestStatus.Rejected => "status-rejected",
+        _ => "status-pending"
+    };
+}
+
+<div class="container page-section">
+
+    <div class="results-head">
+        <div>
+            <h1>Cancellation &amp; refund requests</h1>
+            <span class="result-count">@Model.Count request@(Model.Count == 1 ? "" : "s")</span>
+        </div>
+        <a class="btn-outline" asp-controller="Admin" asp-action="Index">Back to dashboard</a>
+    </div>
+
+    <form method="get" asp-controller="Admin" asp-action="Requests" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px;">
+        <select name="status" style="min-width:160px;">
+            <option value="">All statuses</option>
+            @foreach (var s in Enum.GetValues<RequestStatus>())
+            {
+                <option value="@s" selected="@(status == s)">@s</option>
+            }
+        </select>
+        <select name="type" style="min-width:160px;">
+            <option value="">All types</option>
+            @foreach (var t in Enum.GetValues<RequestType>())
+            {
+                <option value="@t" selected="@(type == t)">@t</option>
+            }
+        </select>
+        <button type="submit" class="btn-outline btn-inline" style="margin-top:0;">Filter</button>
+    </form>
+
+    @if (!Model.Any())
+    {
+        <div class="empty-state">
+            <div class="icon">&#128203;</div>
+            <h3>No requests match this filter</h3>
+        </div>
+    }
+
+    @foreach (var request in Model)
+    {
+        var property = request.Agreement?.Application?.Property;
+        var tenant = request.Agreement?.Application?.Tenant;
+        <div class="checkout-card" style="margin-bottom:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+                <div>
+                    <div style="font-size:16px; font-weight:700;">@request.RequestType &middot; @property?.Title</div>
+                    <div style="font-size:13px; color:var(--text-secondary);">
+                        Agreement #@request.AgreementID &middot; Tenant: @tenant?.FullName &middot;
+                        Raised by: @request.RequestedBy?.FullName
+                    </div>
+                </div>
+                <span class="status-pill @StatusClass(request.Status)">@request.Status</span>
+            </div>
+
+            <p style="margin:12px 0 0; font-size:14px; color:var(--text-secondary);">@request.Reason</p>
+
+            @if (request.RequestedAmount.HasValue)
+            {
+                <div style="margin-top:8px; font-size:13px;">
+                    Requested: RM @request.RequestedAmount.Value.ToString("N2")
+                    @if (request.ApprovedAmount.HasValue)
+                    {
+                        @:&middot; Approved: RM @request.ApprovedAmount.Value.ToString("N2")
+                    }
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(request.AdminNote))
+            {
+                <div class="field-hint" style="margin-top:8px;">Admin note: @request.AdminNote</div>
+            }
+
+            <div style="margin-top:12px; font-size:12px; color:var(--text-muted);">
+                Submitted @request.SubmittedDate.ToString("d MMM yyyy")
+                @if (request.DecidedDate.HasValue)
+                {
+                    @:&middot; Decided @request.DecidedDate.Value.ToString("d MMM yyyy") by @request.DecidedByAdmin?.FullName
+                }
+            </div>
+
+            @if (request.Status == RequestStatus.Pending)
+            {
+                <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; align-items:flex-end;">
+                    <form asp-controller="Admin" asp-action="ApproveRequest" asp-route-id="@request.RequestID" method="post"
+                          style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;"
+                          onsubmit="return confirm('@(request.RequestType == RequestType.Cancellation ? "Approve this cancellation? The tenancy will be terminated." : "Approve this refund?")');">
+                        @if (request.RequestType == RequestType.Refund)
+                        {
+                            <div class="form-row" style="margin:0; min-width:160px;">
+                                <label style="font-size:12px;">Approved amount (RM)</label>
+                                <input type="number" name="approvedAmount" step="0.01" min="0.01"
+                                       value="@request.RequestedAmount?.ToString("F2")" style="margin-top:2px;" />
+                            </div>
+                        }
+                        <div class="form-row" style="margin:0; flex:1; min-width:200px;">
+                            <label style="font-size:12px;">Admin note (optional)</label>
+                            <input type="text" name="adminNote" placeholder="Visible to the requester" style="margin-top:2px;" />
+                        </div>
+                        <button type="submit" class="btn-primary btn-inline" style="margin-top:0;">Approve</button>
+                    </form>
+
+                    <form asp-controller="Admin" asp-action="RejectRequest" asp-route-id="@request.RequestID" method="post"
+                          style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;"
+                          onsubmit="return confirm('Reject this request?');">
+                        <div class="form-row" style="margin:0; flex:1; min-width:200px;">
+                            <label style="font-size:12px;">Reason for rejection (optional)</label>
+                            <input type="text" name="adminNote" placeholder="Visible to the requester" style="margin-top:2px;" />
+                        </div>
+                        <button type="submit" class="btn-outline btn-inline" style="margin-top:0; color:var(--accent-urgent); border-color:var(--accent-urgent);">Reject</button>
+                    </form>
+                </div>
+            }
+        </div>
+    }
+</div>

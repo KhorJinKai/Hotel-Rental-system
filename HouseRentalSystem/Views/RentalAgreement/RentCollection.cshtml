@@ -1,0 +1,120 @@
+@using HouseRentalSystem.Models
+@using HouseRentalSystem.Services
+@model List<HouseRentalSystem.Services.ArrearsSummary>
+@{
+    ViewData["Title"] = "Rent collection";
+
+    string StageClass(ArrearsSummary s) => s.MonthsMissed switch
+    {
+        0 => "status-approved",
+        ArrearsPolicy.ReminderStage => "status-pending",
+        _ => "status-rejected"
+    };
+
+    var behind = Model.Count(s => s.MonthsMissed > 0);
+    var totalOutstanding = Model.Sum(s => s.OutstandingRent + s.OutstandingCompounds);
+}
+
+<div class="container page-section">
+
+    <div class="results-head">
+        <div>
+            <h1>Rent collection</h1>
+            <span class="result-count">
+                @Model.Count tenanc@(Model.Count == 1 ? "y" : "ies") &middot;
+                @behind behind on rent &middot; RM @totalOutstanding.ToString("N0") outstanding
+            </span>
+        </div>
+        <a class="btn-outline" asp-controller="RentalApplication" asp-action="OwnerRequests">Booking requests</a>
+    </div>
+
+    <p class="section-subtitle" style="margin-bottom:18px;">
+        Rent is checked against the schedule every time this page is opened. A missed month sends the tenant a
+        reminder; a second missed month is taken from the security deposit; a third attracts a compound.
+    </p>
+
+    @if (!Model.Any())
+    {
+        <div class="empty-state">
+            <div class="icon">&#128176;</div>
+            <h3>No active tenancies yet</h3>
+            <p>Once you approve a booking request, its rent schedule will be tracked here.</p>
+            <a class="btn-outline" asp-controller="RentalApplication" asp-action="OwnerRequests">View booking requests</a>
+        </div>
+    }
+
+    @foreach (var summary in Model)
+    {
+        var agreement = summary.Agreement;
+        var property = agreement.Application.Property;
+        var tenant = agreement.Application.Tenant;
+
+        <div class="checkout-card" style="margin-bottom:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;">
+                <div>
+                    <p style="font-weight:700; margin:0 0 2px;">@property.Title</p>
+                    <p style="font-size:13px; color:var(--text-secondary); margin:0;">
+                        &#128205; @property.City &middot; Tenant: @tenant.FullName (@tenant.Phone)
+                    </p>
+                    <p style="font-size:12px; color:var(--text-muted); margin:4px 0 0;">
+                        Agreement #@agreement.AgreementID &middot;
+                        @agreement.StartDate.ToString("d MMM yyyy") &ndash; @agreement.EndDate.ToString("d MMM yyyy")
+                    </p>
+                </div>
+                <span class="status-pill @StageClass(summary)">
+                    @(summary.MonthsMissed == 0
+                        ? "Up to date"
+                        : $"{summary.MonthsMissed} month{(summary.MonthsMissed == 1 ? "" : "s")} missed · {summary.Stage}")
+                </span>
+            </div>
+
+            <div class="price-breakdown" style="margin-top:16px;">
+                <div class="row"><span>Monthly rent</span><span>RM @agreement.MonthlyRent.ToString("N0")</span></div>
+                <div class="row"><span>Rent outstanding</span><span>RM @summary.OutstandingRent.ToString("N0")</span></div>
+                <div class="row"><span>Compounds outstanding</span><span>RM @summary.OutstandingCompounds.ToString("N0")</span></div>
+                <div class="row">
+                    <span>Deposit remaining</span>
+                    <span>RM @agreement.DepositBalance.ToString("N0") of RM @agreement.DepositAmount.ToString("N0")</span>
+                </div>
+                @if (summary.OldestOverdueDate.HasValue)
+                {
+                    <div class="row total">
+                        <span>Oldest unpaid instalment</span>
+                        <span>@summary.OldestOverdueDate.Value.ToString("d MMM yyyy")</span>
+                    </div>
+                }
+            </div>
+
+            @if (summary.LatestNotice != null)
+            {
+                <p style="font-size:12.5px; color:var(--text-secondary); margin:14px 0 0; line-height:1.6;">
+                    <strong>Last action (@summary.LatestNotice.IssuedDate.ToString("d MMM yyyy")):</strong>
+                    @summary.LatestNotice.Details
+                </p>
+            }
+
+            @if (agreement.Status == AgreementStatus.Active && summary.IsInArrears)
+            {
+                <p style="font-size:12.5px; color:var(--text-secondary); margin:12px 0 0;">
+                    Late-rent reminders are issued automatically for each missed month - no action needed here.
+                </p>
+            }
+
+            <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
+                <a class="btn-outline btn-inline"
+                   asp-action="Details" asp-route-applicationId="@agreement.ApplicationID">View agreement</a>
+                @{
+                    var hasOverdueCompound = agreement.Payments
+                        .Any(p => p.PaymentType == PaymentType.Compound && p.PaymentStatus == PaymentStatus.Overdue);
+                }
+                @if (agreement.Status == AgreementStatus.Active && hasOverdueCompound)
+                {
+                    <form asp-action="TerminateForArrears" asp-route-id="@agreement.AgreementID" method="post"
+                          onsubmit="return confirm('Terminate this tenancy for non-payment? This cannot be undone.');">
+                        <button type="submit" class="btn-primary btn-inline" style="margin-top:0; background:var(--accent-urgent); border-color:var(--accent-urgent);">Terminate tenancy</button>
+                    </form>
+                }
+            </div>
+        </div>
+    }
+</div>
